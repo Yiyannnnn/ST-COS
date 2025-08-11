@@ -1,0 +1,31 @@
+Package: STCOS
+Title: Spatial Transcriptomics Cell-type Oriented Simulator
+Version: 0.1.0
+Authors@R: 
+    person("Yiyan", "Zhang", , "yiyan@unc.edu", role = c("aut", "cre"))
+Description: A simulator for spatial transcriptomics data that generates realistic 
+    spatial patterns and cell-type specific gene expression profiles preserving gene-gene coexpression.
+License: MIT + file LICENSE
+URL: https://github.com/Yiyannnnn/STCOS
+BugReports: https://github.com/Yiyannnnn/STCOS/issues
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Imports:
+    ggplot2,
+    data.table,
+    cowplot,
+    ggsci,
+    egg,
+    dplyr,
+    expm,
+    scuttle,
+    scater,
+    energy,
+    gamlss,
+    gamlss.dist,
+    copula,
+    parallel,
+    Matrix,
+    mgcv,
+    spdep
