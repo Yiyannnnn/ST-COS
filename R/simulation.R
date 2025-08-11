@@ -70,7 +70,7 @@ generate_true_count <- function(coord, mean_param,
 generate_spot_count <- function(true_count, nGenes, cell_number, celltype_proportion) {
   spot_count <- matrix(0, nrow = nrow(celltype_proportion), ncol = nGenes)
   for (i in colnames(celltype_proportion)){
-    count_attr_cells <- apply(as.matrix(true_count[[i]]), 1,
+    count_attr_cells <- apply(as.matrix(true_count[[i]]), 2,
                              function(gene) gene*cell_number*celltype_proportion[,i])
     spot_count <- spot_count + as.matrix(count_attr_cells)
   }
