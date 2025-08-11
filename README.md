@@ -13,7 +13,7 @@ devtools::install_github("Yiyannnnn/STCOS")
 
 ## Example
 
-Pleased refer to https://yiyannnnn.github.io/STsimulator/Example.html
+Pleased refer to [https://yiyannnnn.github.io/STsimulator/Example.html](https://yiyannnnn.github.io/STCOS_tutorial/Main.html)
 
 
 ## License
