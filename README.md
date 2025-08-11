@@ -2,7 +2,8 @@
 
 ST-COS: Simulator of Spatial Transcriptomic Data Preserving Gene-Gene Co-expression Patterns
 
-<img width="966" height="1417" alt="image" src="https://github.com/user-attachments/assets/eab5c4fa-469a-46b5-a901-471fb3f7455b" />
+<img width="966" height="818" alt="image" src="https://github.com/user-attachments/assets/a2eeff20-c4cf-4f8f-ba6f-e94c725fc86e" />
+
 
 
 ## Installation
