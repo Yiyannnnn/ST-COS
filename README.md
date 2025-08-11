@@ -13,20 +13,9 @@ devtools::install_github("Yiyannnnn/STCOS")
 
 ## Example
 
-Basic usage:
+Pleased refer to https://yiyannnnn.github.io/STsimulator/Example.html
+<img width="236" height="21" alt="image" src="https://github.com/user-attachments/assets/a54c3363-dd56-4dd4-8d16-79bff11aeaae" />
 
-```r
-library(STCOS)
-
-# Generate coordinates
-coords <- generate_coordinates(x_len = 100, 
-                             y_len = 100, 
-                             pattern = "hex",
-                             spot_distance = 10)
-
-# Generate patterns
-# Add your example code here
-```
 
 ## License
 
