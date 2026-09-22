@@ -159,7 +159,8 @@ specified through the reference-free workflow.
 
 ## Documentation and support
 
-- [Full tutorial source](https://github.com/Yiyannnnn/STCOS_tutorial)
+- [Full tutorial](https://yiyannnnn.github.io/STCOS_tutorial/Main.html)
+- [Tutorial source](https://github.com/Yiyannnnn/STCOS_tutorial)
 - [Report a problem or request a feature](https://github.com/Yiyannnnn/ST-COS/issues)
 - In R, run `help(package = "STCOS")` or `?generate_true_count` for function
   documentation.
