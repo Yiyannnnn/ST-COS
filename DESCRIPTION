@@ -3,29 +3,23 @@ Title: Spatial Transcriptomics Cell-type Oriented Simulator
 Version: 0.1.0
 Authors@R: 
     person("Yiyan", "Zhang", , "yiyan@unc.edu", role = c("aut", "cre"))
-Description: A simulator for spatial transcriptomics data that generates realistic 
-    spatial patterns and cell-type specific gene expression profiles preserving gene-gene coexpression.
+Description: A simulator for spatial transcriptomics data with configurable
+    spatial patterns, cell-type-specific expression profiles, and explicit
+    latent Gaussian pairwise-dependence parameters. Realized count-scale
+    dependence is generated through negative-binomial marginals and is not
+    assumed to equal the latent target.
 License: MIT + file LICENSE
-URL: https://github.com/Yiyannnnn/STCOS
-BugReports: https://github.com/Yiyannnnn/STCOS/issues
+URL: https://github.com/Yiyannnnn/ST-COS
+BugReports: https://github.com/Yiyannnnn/ST-COS/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.3
 Imports:
-    ggplot2,
     data.table,
-    cowplot,
-    ggsci,
-    egg,
-    dplyr,
     expm,
-    scuttle,
-    scater,
-    energy,
-    gamlss,
-    gamlss.dist,
-    copula,
     parallel,
-    Matrix,
     mgcv,
     spdep
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

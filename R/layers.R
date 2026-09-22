@@ -9,10 +9,11 @@
 #' @return Data frame with layer assignments
 #' @keywords internal
 generate_strap_layer <- function(coord, x_start, x_end, y_start, y_end, layer_id) {
-  coord <- coord |> filter(x_coord > x_start & x_coord <= x_end & 
-                         y_coord > y_start & y_coord <= y_end) |>
-    mutate(layer = layer_id)
-  return(coord)
+  keep <- coord$x_coord > x_start & coord$x_coord <= x_end &
+    coord$y_coord > y_start & coord$y_coord <= y_end
+  coord_layer <- coord[keep, , drop = FALSE]
+  coord_layer$layer <- layer_id
+  coord_layer
 }
 
 #' Generate layer coordinates
@@ -28,10 +29,10 @@ generate_layer <- function(coord, xmin, xmax, ymin, ymax) {
   if (length(xmin) != length(xmax) | length(ymin) != length(ymax) | length(xmin) != length(ymin)) {
     print("layer boundry length not match.")
   }
-  x_min <- c(xmin[1]-10e-6, xmin[2]-10e-6, xmin[3]-10e-6, xmin[4]-10e-6)
-  x_max <- c(xmax[1]+10e-6, xmax[2]+10e-6, xmax[3]+10e-6, xmax[4]+10e-6)
-  y_min <- c(ymin[1]-10e-6, ymin[2]-10e-6, ymin[3]-10e-6, ymin[4]-10e-6)
-  y_max <- c(ymax[1]+10e-6, ymax[2]+10e-6, ymax[3]+10e-6, ymax[4]+10e-6)
+  x_min <- xmin - 10e-6
+  x_max <- xmax + 10e-6
+  y_min <- ymin - 10e-6
+  y_max <- ymax + 10e-6
   
   layer_df <- data.frame()
   for (i in 1:length(xmin)) {
@@ -44,8 +45,8 @@ generate_layer <- function(coord, xmin, xmax, ymin, ymax) {
     layer_df <- rbind(layer_df, layer_i)
   }
   
-  layer_df <- layer_df[!duplicated(layer_df[,c(1,2)]), ] |> 
-    mutate(layer = ifelse(layer == 0, 1, layer))
+  layer_df <- layer_df[!duplicated(layer_df[, c("x_coord", "y_coord")]), ]
+  layer_df$layer[layer_df$layer == 0] <- 1
   
   layer_coord = merge(coord, layer_df, by = c("x_coord","y_coord"), sort = FALSE)
   return(layer_coord)

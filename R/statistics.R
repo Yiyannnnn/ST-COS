@@ -1,21 +1,26 @@
 #' Fit negative binomial parameters
 #' 
-#' @param y Vector of counts
+#' @param y Vector of counts.
+#' @param dispersion_cap Finite approximation to the Poisson boundary used
+#'   when the empirical variance is no larger than the mean. Set to `Inf` to
+#'   use the explicit Poisson limit.
 #' @return Named vector with mu and theta parameters
 #' @keywords internal
-fit_nb_fast <- function(y) {
-  mu <- mean(y); s2 <- var(y)
-  th <- if (s2 > mu) mu^2 / (s2 - mu) else 1e6
+fit_nb_fast <- function(y, dispersion_cap = 1e6) {
+  mu <- mean(y); s2 <- stats::var(y)
+  th <- if (s2 > mu) mu^2 / (s2 - mu) else dispersion_cap
   return(c(mu = mu, theta = th))
 }
 
 #' Calculate negative binomial parameters for expression matrix
 #' 
 #' @param expr Expression matrix
+#' @param dispersion_cap Dispersion fallback passed to the moment estimator.
 #' @return List with mu and theta vectors
 #' @keywords internal
-calculate_nb_params <- function(expr) {
-  nb_par <- t(apply(expr, 1, fit_nb_fast))
+calculate_nb_params <- function(expr, dispersion_cap = 1e6) {
+  nb_par <- t(apply(expr, 1, fit_nb_fast,
+                    dispersion_cap = dispersion_cap))
   mu_g <- nb_par[, "mu"]
   theta_g <- nb_par[, "theta"]
   return(list(mu = mu_g, theta = theta_g))
@@ -39,7 +44,7 @@ counts2z_block <- function(idx, Y, mu, th, rng_block, eps = 1e-6) {
     u1 <- pnbinom(y, size = th[g], mu = mu[g])
     u  <- u0 + rng_block[ii, ] * (u1 - u0)               # DT jitter
     u  <- pmin(pmax(u, eps), 1 - eps)                    # keep in (eps,1-eps)
-    out[ii, ] <- qnorm(u)
+    out[ii, ] <- stats::qnorm(u)
   }
   return(out)
 }
@@ -58,10 +63,17 @@ generate_z_matrix <- function(expr, mu_g, theta_g, block = 1024, n_cores = 1, ep
   G <- nrow(expr)
   idx_ls <- split(seq_len(G), ceiling(seq_len(G) / block))
   rng <- matrix(runif(G * ncol(expr)), nrow = G)         # pre-draw all jitters
-  Zparts <- mclapply(idx_ls, counts2z_block,
-                     Y = expr, mu = mu_g, th = theta_g,
-                     rng_block = rng[idx_ls[[1]], , drop = FALSE],
-                     eps = eps, mc.cores = n_cores)
+  worker <- function(idx) {
+    counts2z_block(
+      idx, Y = expr, mu = mu_g, th = theta_g,
+      rng_block = rng[idx, , drop = FALSE], eps = eps
+    )
+  }
+  Zparts <- if (n_cores > 1L) {
+    parallel::mclapply(idx_ls, worker, mc.cores = n_cores)
+  } else {
+    lapply(idx_ls, worker)
+  }
   return(t(do.call(rbind, Zparts)))
 }
 
@@ -69,14 +81,18 @@ generate_z_matrix <- function(expr, mu_g, theta_g, block = 1024, n_cores = 1, ep
 #' 
 #' @param Z Z-score matrix
 #' @param thr Threshold for correlation
-#' @return Correlation matrix
+#' @param epsilon Minimum eigenvalue used to repair the thresholded matrix.
+#' @return Correlation matrix with repair diagnostics stored in the
+#'   `repair_diagnostics` attribute.
 #' @keywords internal
-calculate_correlation_matrix <- function(Z, thr = 0.05) {
-  Sigma <- cor(Z, use = "pairwise.complete.obs")  # handle constant-variance genes
+calculate_correlation_matrix <- function(Z, thr = 0.05, epsilon = 1e-6) {
+  Sigma <- stats::cor(Z, use = "pairwise.complete.obs")
   Sigma[is.na(Sigma)] <- 0                          # undefined → no corr
   diag(Sigma) <- 1                                  # proper 1’s on the diagonal
   Sigma[abs(Sigma) < thr] <- 0                      # optional sparsity
-  return(makespd(Sigma))                         # repair PD if needed
+  repaired <- makespd(Sigma, epsilon = epsilon, return_diagnostics = TRUE)
+  attr(repaired$rho, "repair_diagnostics") <- repaired$diagnostics
+  repaired$rho
 }
 
 #' Moran's I flag
@@ -87,12 +103,12 @@ calculate_correlation_matrix <- function(Z, thr = 0.05) {
 #' @return Logical vector indicating flagged genes
 #' @keywords internal
 moran_flag <- function(y, listw, thr = 0.15) {
-  S0  <- Szero(listw)                          # sum of all weights
-  res <- moran(x  = y,
-               listw = listw,
-               n    = length(y),
-               S0   = S0,
-               zero.policy = TRUE)$I
+  S0  <- spdep::Szero(listw)                          # sum of all weights
+  res <- spdep::moran(x  = y,
+                      listw = listw,
+                      n    = length(y),
+                      S0   = S0,
+                      zero.policy = TRUE)$I
   return(res > thr)
 }
 
@@ -132,9 +148,12 @@ prepare_mu_mat <- function(expr, mu_g, lib_factor) {
 #' @param spatial_genes Spatial genes
 #' @param mu_mat Mu matrix
 #' @param theta_g Theta parameters
+#' @param spline_k Basis dimension for the thin-plate spline.
 #' @return Updated mu_mat and theta_g
 #' @keywords internal
-refit_nb_gam_for_spatial_genes <- function(expr, coord, lib_factor, spatial_genes, mu_mat, theta_g) {
+refit_nb_gam_for_spatial_genes <- function(expr, coord, lib_factor,
+                                           spatial_genes, mu_mat, theta_g,
+                                           spline_k = 50) {
   for (g in spatial_genes) {
     dat <- data.frame(
       y       = as.numeric(expr[g, ]),
@@ -142,10 +161,11 @@ refit_nb_gam_for_spatial_genes <- function(expr, coord, lib_factor, spatial_gene
       col     = coord$col,
       log_lib = log(lib_factor)
     )
-    gam_fit <- gam(y ~ offset(log_lib) +
-                     s(row, col, bs = "tp", k = 50),
-                   family = nb(link = "log"), data = dat, method = "REML")
-    mu_mat[, g] <- fitted(gam_fit)                    # spot-wise means
+    gam_fit <- mgcv::gam(y ~ offset(log_lib) +
+                          s(row, col, bs = "tp", k = spline_k),
+                        family = mgcv::nb(link = "log"),
+                        data = dat, method = "REML")
+    mu_mat[, g] <- stats::fitted(gam_fit)             # spot-wise means
     theta_g[g]  <- gam_fit$family$getTheta(TRUE)      # update dispersion
   }
   return(list(mu_mat = mu_mat, theta_g = theta_g))
@@ -157,12 +177,16 @@ refit_nb_gam_for_spatial_genes <- function(expr, coord, lib_factor, spatial_gene
 #' @param Sigma Correlation matrix
 #' @param mu_mat Mu matrix
 #' @param gene_names Gene names
-#' @return List of mean_param, gene_relationship, and cov_gene
+#' @param theta_g Gene-specific negative-binomial size parameters.
+#' @param matrix_diagnostics Diagnostics from correlation-matrix repair.
+#' @return List of mean parameters, dispersions, dependence parameters, and
+#'   matrix-repair diagnostics.
 #' @keywords internal
-prepare_input <- function(expr, Sigma, mu_mat, gene_names) {
+prepare_input <- function(expr, Sigma, mu_mat, gene_names, theta_g,
+                          matrix_diagnostics = NULL) {
   mean_param <- list(CT = mu_mat)
   
-  gene_relationship <- as.data.table(
+  gene_relationship <- data.table::as.data.table(
     matrix(1, nrow = nrow(expr), ncol = 1,
            dimnames = list(rownames(expr), "CT"))
   )
@@ -173,7 +197,13 @@ prepare_input <- function(expr, Sigma, mu_mat, gene_names) {
                     dim       = c(nrow(expr), nrow(expr),1),
                     dimnames  = list(rownames(expr), rownames(expr), "CT"))
   
-  return(list(mean_param = mean_param, gene_relationship = gene_relationship, cov_gene = cov_gene))
+  return(list(
+    mean_param = mean_param,
+    theta_g = list(CT = theta_g),
+    gene_relationship = gene_relationship,
+    cov_gene = cov_gene,
+    matrix_diagnostics = matrix_diagnostics
+  ))
 }
 
 #' Main function to estimate real parameters
@@ -185,11 +215,20 @@ prepare_input <- function(expr, Sigma, mu_mat, gene_names) {
 #' @param cor_thr Correlation threshold
 #' @param block_size Block size for processing
 #' @param n_cores Number of cores for parallel processing
+#' @param eigen_floor Minimum eigenvalue used to repair the latent correlation
+#'   matrix.
+#' @param neighbor_k Number of nearest neighbors used for Moran's I.
+#' @param spline_k Basis dimension used by the thin-plate spline.
+#' @param dispersion_cap Finite negative-binomial size used at the Poisson
+#'   boundary. Set to `Inf` for the explicit Poisson limit.
 #' @return List of estimated parameters
 #' @export
-get_real_param <- function(expr, coord, gene_names, moran_thr = 0.15, cor_thr = 0.05, block_size = 1024, n_cores = 1) {
+get_real_param <- function(expr, coord, gene_names, moran_thr = 0.15,
+                           cor_thr = 0.05, block_size = 1024, n_cores = 1,
+                           eigen_floor = 1e-6, neighbor_k = 6,
+                           spline_k = 50, dispersion_cap = 1e6) {
   # Step 1: Calculate negative binomial parameters
-  nb_params <- calculate_nb_params(expr)
+  nb_params <- calculate_nb_params(expr, dispersion_cap = dispersion_cap)
   mu_g <- nb_params$mu
   theta_g <- nb_params$theta
   
@@ -197,12 +236,15 @@ get_real_param <- function(expr, coord, gene_names, moran_thr = 0.15, cor_thr = 
   Z <- generate_z_matrix(expr, mu_g, theta_g, block = block_size, n_cores = n_cores)
   
   # Step 3: Calculate the correlation matrix
-  Sigma <- calculate_correlation_matrix(Z, thr = cor_thr)
+  Sigma <- calculate_correlation_matrix(
+    Z, thr = cor_thr, epsilon = eigen_floor
+  )
+  matrix_diagnostics <- attr(Sigma, "repair_diagnostics")
   
   # Step 4: Create spatial gene detection
   coords_mat <- as.matrix(coord[, c("row", "col")])
-  Wnb <- knearneigh(coords_mat, k = 6)
-  W <- nb2listw(knn2nb(Wnb))
+  Wnb <- spdep::knearneigh(coords_mat, k = neighbor_k)
+  W <- spdep::nb2listw(spdep::knn2nb(Wnb))
   spatial_genes <- detect_spatial_genes(expr, W, gene_names, moran_thr)
   
   # Step 5: Prepare mu_mat
@@ -211,12 +253,18 @@ get_real_param <- function(expr, coord, gene_names, moran_thr = 0.15, cor_thr = 
   mu_mat <- prepare_mu_mat(expr, mu_g, lib_factor)
   
   # Step 6: Refit NB-GAM for spatial genes
-  gam_results <- refit_nb_gam_for_spatial_genes(expr, coord, lib_factor, spatial_genes, mu_mat, theta_g)
+  gam_results <- refit_nb_gam_for_spatial_genes(
+    expr, coord, lib_factor, spatial_genes, mu_mat, theta_g,
+    spline_k = spline_k
+  )
   mu_mat <- gam_results$mu_mat
   theta_g <- gam_results$theta_g
   
   # Step 7: Prepare YZ input objects
-  real_param <- prepare_input(expr, Sigma, mu_mat, gene_names)
+  real_param <- prepare_input(
+    expr, Sigma, mu_mat, gene_names, theta_g,
+    matrix_diagnostics = matrix_diagnostics
+  )
   
   return(real_param)
 }

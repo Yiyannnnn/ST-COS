@@ -75,57 +75,100 @@ generate_pattern <- function(coord, pattern,
 #' @param all_lower_mean Lower bound for mean
 #' @param all_upper_mean Upper bound for mean
 #' @param seed Random seed
-#' @return List of mean matrices per cell type
+#' @param layer_assignments Optional vector of layer labels shared by cell
+#'   types, or a named list with one vector per cell type.
+#' @return Named list of spot-by-gene mean matrices, one per cell type.
 #' @export
 generate_gene_pattern <- function(coord, gene_pattern,
                                 center_coord=NULL, center_param=NULL,
                                 background_param=NULL, hot_spot_size=NULL,
                                 streak_x=NULL, streak_x_param=NULL, streak_size=NULL,
                                 layer=NULL, layer_param=NULL,
-                                all_lower_mean=10, all_upper_mean=150, seed=1) {
+                                all_lower_mean=10, all_upper_mean=150, seed=1,
+                                layer_assignments = NULL) {
   set.seed(seed)
-  # Initialize mean matrix
-  mean_matrix <- matrix(0, nrow = nrow(coord), ncol = length(gene_pattern))
-  colnames(mean_matrix) <- paste0("Gene", 1:length(gene_pattern))
-  
-  for (g in 1:length(gene_pattern)) {
-    pattern <- gene_pattern[[g]]
-    
-    # Hot spot parameters
-    if(!is.null(pattern$hot_spot)){
-      hot_spot_size = pattern$hot_spot$size
-      center_coord = pattern$hot_spot$center
-      center_param = pattern$hot_spot$param
-      background_param = pattern$hot_spot$background_param
-      mean_matrix[,g] <- generate_pattern(coord, "hot_spot", 
-                                         center_coord, center_param,
-                                         background_param, hot_spot_size)
+  gene_pattern <- as.data.frame(gene_pattern, check.names = FALSE)
+  n_genes <- nrow(gene_pattern)
+  gene_names <- rownames(gene_pattern)
+  if (is.null(gene_names)) gene_names <- paste0("gene_", seq_len(n_genes))
+  mean_matrix_all <- vector("list", ncol(gene_pattern))
+  names(mean_matrix_all) <- colnames(gene_pattern)
+
+  for (cell_type in colnames(gene_pattern)) {
+    mean_matrix <- matrix(
+      NA_real_, nrow = nrow(coord), ncol = n_genes,
+      dimnames = list(rownames(coord), gene_names)
+    )
+    for (g in seq_len(n_genes)) {
+      pattern <- gene_pattern[g, cell_type]
+      if (pattern %in% c("hotspot", "hot_spot")) {
+        positions <- which(gene_pattern[, cell_type] %in% c("hotspot", "hot_spot"))
+        center <- if (is.list(center_coord) && cell_type %in% names(center_coord)) {
+          center_coord[[cell_type]][which(positions == g), , drop = FALSE]
+        } else {
+          data.frame(
+            x_coord = mean(coord$x_coord),
+            y_coord = mean(coord$y_coord)
+          )
+        }
+        center_value <- if (is.null(center_param)) runif(1, 50, 80) else center_param
+        background_value <- if (is.null(background_param)) {
+          center_value + sample(c(-1, 1), 1) * runif(1, 20, 50)
+        } else {
+          background_param
+        }
+        radius <- if (is.null(hot_spot_size)) {
+          0.45 * min(diff(range(coord$x_coord)), diff(range(coord$y_coord)))
+        } else {
+          hot_spot_size
+        }
+        param <- generate_pattern(
+          coord, "hot_spot", center_coord = center,
+          center_param = center_value, background_param = background_value,
+          hot_spot_size = radius
+        )
+      } else if (pattern == "streak") {
+        x_value <- if (is.null(streak_x)) mean(coord$x_coord) else streak_x
+        streak_value <- if (is.null(streak_x_param)) runif(1, 50, 80) else streak_x_param
+        background_value <- if (is.null(background_param)) {
+          streak_value + sample(c(-1, 1), 1) * runif(1, 20, 50)
+        } else {
+          background_param
+        }
+        width <- if (is.null(streak_size)) diff(range(coord$x_coord)) / 2 else streak_size
+        param <- generate_pattern(
+          coord, "streak", streak_x = x_value,
+          streak_x_param = streak_value,
+          background_param = background_value, streak_size = width
+        )
+      } else if (pattern == "layer") {
+        layer_values <- layer
+        if (!is.null(layer_assignments)) {
+          if (is.list(layer_assignments)) {
+            layer_values <- layer_assignments[[cell_type]]
+            if (is.null(layer_values)) layer_values <- layer_assignments[["default"]]
+          } else {
+            layer_values <- layer_assignments
+          }
+        }
+        if (is.null(layer_values) || length(layer_values) != nrow(coord)) {
+          stop("Layer-pattern genes require one layer assignment per spot.")
+        }
+        layer_levels <- as.integer(factor(layer_values))
+        values <- layer_param
+        if (is.null(values)) values <- runif(length(unique(layer_levels)), 0, 150)
+        param <- generate_pattern(
+          coord, "layer", layer = layer_levels, layer_param = values
+        )
+      } else if (pattern == "no_pattern") {
+        param <- rep(runif(1, all_lower_mean, all_upper_mean), nrow(coord))
+      } else {
+        stop(sprintf("Unknown pattern '%s' for gene %s.", pattern, gene_names[g]))
+      }
+      mean_matrix[, g] <- param
     }
-    
-    # Streak parameters
-    if(!is.null(pattern$streak)){
-      streak_x = pattern$streak$x
-      streak_x_param = pattern$streak$param
-      streak_size = pattern$streak$size
-      mean_matrix[,g] <- generate_pattern(coord, "streak", 
-                                         streak_x = streak_x, 
-                                         streak_x_param = streak_x_param, 
-                                         streak_size = streak_size)
-    }
-    
-    # Layer parameters
-    if(!is.null(pattern$layer)){
-      layer = pattern$layer$assignment
-      layer_param = pattern$layer$param
-      mean_matrix[,g] <- generate_pattern(coord, "layer", 
-                                         layer = layer, 
-                                         layer_param = layer_param)
-    }
-    
-    # Apply global mean adjustment
-    global_mean = runif(1, all_lower_mean, all_upper_mean)
-    mean_matrix[,g] <- mean_matrix[,g] + global_mean
+    mean_matrix_all[[cell_type]] <- mean_matrix
   }
-  
-  return(mean_matrix)
+
+  mean_matrix_all
 }

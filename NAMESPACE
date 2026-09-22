@@ -24,10 +24,6 @@ export(generate_batch_count)
 export(get_real_param)
 
 # Imports
-import(data.table)
-import(dplyr)
-importFrom(Matrix, sparse.model.matrix)
-importFrom(mgcv, gam)
-importFrom(spdep, knearneigh, nb2listw, knn2nb)
+importFrom(mgcv, s)
 importFrom(expm, expm)
 importFrom(stats, dist, rnorm, runif, rbinom, rnbinom, pnbinom, qnbinom)

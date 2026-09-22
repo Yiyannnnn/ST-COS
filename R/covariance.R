@@ -9,7 +9,7 @@ generate_covariance <- function(gene_relationship) {
   for(ct in colnames(gene_relationship)) {
     cov0 = matrix(rep(0,nrow(gene_relationship)^2),nrow=nrow(gene_relationship))
     diag(cov0) = abs(rnorm(nrow(gene_relationship)))
-    correlated_gene = which(unlist(gene_relationship%>%select(ct)))
+    correlated_gene = which(!is.na(gene_relationship[[ct]]))
     random_matrix = matrix(rnorm(length(correlated_gene)^2),nrow=length(correlated_gene))
     random_matrix = random_matrix+t(random_matrix)
     random_matrix = expm(random_matrix)
@@ -34,15 +34,15 @@ generate_covariance_group <- function(gene_relationship) {
     diag(cov0) = abs(rnorm(nrow(gene_relationship)))
     for(gp in unique(unlist(gene_relationship))) {
       if (is.na(gp)) {
-        non_correlated_gene = which(unlist(gene_relationship |> select(ct)) == gp)
-        random_matrix = matrix(rep(0,length(non_correlated_gene)^2),nrow=length(non_correlated_gene))
-      }
-      else {
-        correlated_gene = which(unlist(gene_relationship |> select(ct)) == gp)
+        next
+      } else {
+        correlated_gene = which(gene_relationship[[ct]] == gp)
         random_matrix = matrix(abs(rnorm(length(correlated_gene)^2)),nrow=length(correlated_gene))
         random_matrix = random_matrix+t(random_matrix)
         random_matrix = expm(random_matrix)
-        cov0[correlated_gene,correlated_gene]=random_matrix
+        if (length(correlated_gene)) {
+          cov0[correlated_gene,correlated_gene]=random_matrix
+        }
       }
     }
     cov_matrix[,,ct] = cov0
