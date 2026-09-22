@@ -11,6 +11,9 @@ ST-COS supports two workflows:
 - **Reference-based simulation:** estimate marginal, spatial, and global
   spot-level dependence parameters from an observed spatial transcriptomics
   dataset and generate new profiles from the fitted model.
+- **Image-guided design:** upload a histology image or coordinate file and
+  configure a reference-free simulation interactively in the hosted Shiny
+  application.
 
 <img width="966" alt="ST-COS simulation and downstream analysis workflow" src="man/figures/figure1.png" />
 
@@ -28,6 +31,26 @@ Then load the package:
 ```r
 library(STCOS)
 ```
+
+## Image-guided application
+
+Open the hosted ST-COS application from an interactive R session:
+
+```r
+launch_stcos_app()
+```
+
+The application supports histology-image upload and segmentation, uploaded
+coordinates, interactive region selection, gene-pattern assignment,
+cell-type composition, and gene-dependence controls. On a headless system,
+retrieve the URL without trying to open a browser:
+
+```r
+launch_stcos_app(browser = FALSE)
+```
+
+The hosted application is also available directly at
+[yiyanz.shinyapps.io/st-cos](https://yiyanz.shinyapps.io/st-cos/).
 
 ## Quick start
 

@@ -89,3 +89,11 @@ test_that("gene-pattern generation does not rely on a global gene count", {
   expect_equal(dim(means$CT), c(4, 2))
   expect_equal(unname(means$CT[, "g2"]), c(2, 2, 8, 8))
 })
+
+test_that("image-guided app launcher exposes the hosted application", {
+  expect_identical(
+    launch_stcos_app(browser = FALSE),
+    "https://yiyanz.shinyapps.io/st-cos/"
+  )
+  expect_error(launch_stcos_app(browser = NA), "TRUE or FALSE")
+})
