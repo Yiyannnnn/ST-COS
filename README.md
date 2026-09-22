@@ -14,7 +14,7 @@ independent individual cells within a spot. Reference-based estimation returns
 one global spot-level dependence matrix; cell-type-specific matrices must be
 provided externally or specified in the reference-free workflow.
 
-<img width="966" height="818" alt="image" src="https://github.com/user-attachments/assets/a2eeff20-c4cf-4f8f-ba6f-e94c725fc86e" />
+<img width="966" alt="ST-COS simulation and downstream analysis workflow" src="man/figures/figure1.png" />
 
 
 
