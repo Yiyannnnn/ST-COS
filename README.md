@@ -4,7 +4,7 @@
 configurable spatial expression patterns, cell-type compositions,
 negative-binomial marginals, and editable gene-gene dependence.
 
-ST-COS supports two workflows:
+ST-COS supports three workflows:
 
 - **Reference-free simulation:** design coordinates, cell-type composition,
   spatial gene patterns, and cell-type-specific latent correlation matrices.
@@ -12,8 +12,8 @@ ST-COS supports two workflows:
   spot-level dependence parameters from an observed spatial transcriptomics
   dataset and generate new profiles from the fitted model.
 - **Image-guided design:** upload a histology image or coordinate file and
-  configure a reference-free simulation interactively in the hosted Shiny
-  application.
+  configure a reference-free simulation interactively in a local or hosted
+  Shiny application.
 
 <img width="966" alt="ST-COS simulation and downstream analysis workflow" src="man/figures/figure1.png" />
 
@@ -34,16 +34,33 @@ library(STCOS)
 
 ## Image-guided application
 
-Open the hosted ST-COS application from an interactive R session:
+### Run locally from R
+
+`stcos_shiny_app()` constructs a real Shiny application with
+`shiny::shinyApp(ui, server)`. Run it from an R session with:
+
+```r
+app <- stcos_shiny_app()
+shiny::runApp(app)
+```
+
+The local designer accepts a PNG or JPEG histology image, uploaded coordinate
+tables, image-click coordinates, and generated grid, hexagonal, or random
+layouts. It overlays the coordinates on the image and exports a CSV that can
+be supplied to the reference-free workflow. The optional local interface uses
+the `shiny`, `png`, and `jpeg` packages.
+
+### Open the hosted application
+
+The hosted application additionally provides image segmentation, interactive
+region selection, gene-pattern assignment, cell-type composition, and
+gene-dependence controls. Open it from R with:
 
 ```r
 launch_stcos_app()
 ```
 
-The application supports histology-image upload and segmentation, uploaded
-coordinates, interactive region selection, gene-pattern assignment,
-cell-type composition, and gene-dependence controls. On a headless system,
-retrieve the URL without trying to open a browser:
+On a headless system, retrieve the URL without trying to open a browser:
 
 ```r
 launch_stcos_app(browser = FALSE)

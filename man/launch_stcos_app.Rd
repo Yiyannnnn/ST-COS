@@ -2,7 +2,7 @@
 % Please edit documentation in R/app.R
 \name{launch_stcos_app}
 \alias{launch_stcos_app}
-\title{Launch the ST-COS image-guided application}
+\title{Open the hosted ST-COS image-guided application}
 \usage{
 launch_stcos_app(browser = interactive())
 }
@@ -15,7 +15,7 @@ opening a browser. The default is \code{interactive()}.}
 The application URL, invisibly.
 }
 \description{
-Opens the hosted ST-COS Shiny application, which provides interactive
+Opens the full hosted ST-COS Shiny application, which provides interactive
 coordinate design, histology-image upload and segmentation, gene-pattern
 configuration, cell-type composition, and gene-dependence controls.
 }

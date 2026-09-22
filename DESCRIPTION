@@ -21,5 +21,8 @@ Imports:
     mgcv,
     spdep
 Suggests:
+    jpeg,
+    png,
+    shiny,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

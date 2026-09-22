@@ -97,3 +97,11 @@ test_that("image-guided app launcher exposes the hosted application", {
   )
   expect_error(launch_stcos_app(browser = NA), "TRUE or FALSE")
 })
+
+test_that("local image-guided app is a Shiny application", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("png")
+  skip_if_not_installed("jpeg")
+
+  expect_s3_class(stcos_shiny_app(), "shiny.appobj")
+})
