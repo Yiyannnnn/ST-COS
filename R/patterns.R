@@ -11,9 +11,7 @@
 #' @param streak_size Size of streaks
 #' @param layer Layer assignments
 #' @param layer_param Layer parameters
-#' @param seed Retained for backward compatibility. `generate_pattern()` is
-#'   deterministic once its pattern parameters are supplied and does not alter
-#'   the random-number generator state.
+#' @param seed Random seed
 #' @return Vector of expression values
 #' @export
 generate_pattern <- function(coord, pattern, 
@@ -21,6 +19,7 @@ generate_pattern <- function(coord, pattern,
                            background_param=NULL, hot_spot_size=NULL,
                            streak_x=NULL, streak_x_param=NULL, streak_size=NULL,
                            layer=NULL, layer_param=NULL, seed=123) {
+  set.seed(seed)
   # hot spot
   if(pattern == "hot_spot"){
     #center_coord = data.table(x_coord = center_coord[1],y_coord = center_coord[2])
@@ -65,12 +64,8 @@ generate_pattern <- function(coord, pattern,
 #' @param coord Coordinates data.table
 #' @param gene_pattern Gene pattern specifications
 #' @param center_coord Center coordinates for hotspots
-#' @param center_param Hotspot expression level. A scalar is reused for every
-#'   requested gene and cell type; when omitted, a separate value is sampled
-#'   for each gene-cell-type combination.
-#' @param background_param Background expression level. A scalar is reused for
-#'   every requested gene and cell type; when omitted, a separate value is
-#'   sampled for each gene-cell-type combination.
+#' @param center_param Center parameters
+#' @param background_param Background parameters
 #' @param hot_spot_size Hotspot sizes
 #' @param streak_x Streak x positions
 #' @param streak_x_param Streak parameters
@@ -82,10 +77,7 @@ generate_pattern <- function(coord, pattern,
 #' @param seed Random seed
 #' @param layer_assignments Optional vector of layer labels shared by cell
 #'   types, or a named list with one vector per cell type.
-#' @return Named list of spot-by-gene mean matrices, one per cell type. Thus
-#'   each entry represents the full set of gene-, cell-type-, and
-#'   location-specific means even though each pattern is constructed from
-#'   scalar foreground and background levels.
+#' @return Named list of spot-by-gene mean matrices, one per cell type.
 #' @export
 generate_gene_pattern <- function(coord, gene_pattern,
                                 center_coord=NULL, center_param=NULL,

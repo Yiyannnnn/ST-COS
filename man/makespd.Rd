@@ -9,10 +9,7 @@ makespd(rho, epsilon = 1e-06, return_diagnostics = FALSE)
 \arguments{
 \item{rho}{Correlation matrix to adjust.}
 
-\item{epsilon}{Numerical eigenvalue floor used for repair. If the smallest
-eigenvalue is below this value, the minimum uniform shift needed to reach
-the floor is added to every eigenvalue before unit-diagonal
-renormalization.}
+\item{epsilon}{Minimum eigenvalue after repair.}
 
 \item{return_diagnostics}{Return the repaired matrix and perturbation
 diagnostics in a list.}

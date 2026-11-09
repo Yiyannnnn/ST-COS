@@ -6,14 +6,8 @@
 *-Ex.R
 /*.tar.gz
 /*.Rcheck/
-/..Rcheck/
 vignettes/*.html
 vignettes/*.pdf
 .httr-oauth
 *_cache/
 /cache/
-/reproducibility/data_external/*
-!/reproducibility/data_external/README.md
-/reproducibility/results/
-__pycache__/
-*.pyc

@@ -183,9 +183,7 @@ generate_spot_count <- function(true_count, nGenes, cell_number, celltype_propor
 #' Generate batch effects in counts
 #' 
 #' @param true_count True count matrices
-#' @param p0 Per-molecule binomial thinning probability. Each input count `n`
-#'   is replaced by a `Binomial(n, 1 - p0)` draw. This operation can increase
-#'   the observed zero proportion but is not a zero-inflated mixture model.
+#' @param p0 Dropout probability
 #' @param celltype_proportion Cell type proportions
 #' @param seq_depth Sequencing depth
 #' @return List of count matrices with batch effects

@@ -11,10 +11,7 @@ cdist <- function(X, Y) {
 #' Make a correlation matrix positive definite
 #'
 #' @param rho Correlation matrix to adjust.
-#' @param epsilon Numerical eigenvalue floor used for repair. If the smallest
-#'   eigenvalue is below this value, the minimum uniform shift needed to reach
-#'   the floor is added to every eigenvalue before unit-diagonal
-#'   renormalization.
+#' @param epsilon Minimum eigenvalue after repair.
 #' @param return_diagnostics Return the repaired matrix and perturbation
 #'   diagnostics in a list.
 #' @return A positive-definite correlation matrix, or a list containing the
@@ -32,8 +29,7 @@ makespd <- function(rho, epsilon = 1e-6, return_diagnostics = FALSE) {
   requested <- (rho + t(rho)) / 2
   diag(requested) <- 1
   eig <- eigen(requested, symmetric = TRUE)
-  uniform_shift <- max(0, epsilon - min(eig$values))
-  repaired_values <- eig$values + uniform_shift
+  repaired_values <- pmax(eig$values, epsilon)
   repaired <- eig$vectors %*%
     diag(repaired_values, nrow = length(repaired_values)) %*%
     t(eig$vectors)
@@ -47,10 +43,8 @@ makespd <- function(rho, epsilon = 1e-6, return_diagnostics = FALSE) {
     min_eigen_after = min(eigen(
       repaired, symmetric = TRUE, only.values = TRUE
     )$values),
-    minimum_eigenvalue_lift = uniform_shift,
-    uniform_eigenvalue_shift = uniform_shift,
-    n_eigenvalues_below_floor = sum(eig$values < epsilon),
-    n_eigenvalues_modified = if (uniform_shift > 0) length(eig$values) else 0L,
+    minimum_eigenvalue_lift = max(epsilon - min(eig$values), 0),
+    n_eigenvalues_modified = sum(eig$values < epsilon),
     relative_frobenius_perturbation =
       sqrt(sum((repaired - requested)^2)) /
       max(sqrt(sum(requested^2)), .Machine$double.eps),

@@ -29,13 +29,9 @@ generate_gene_pattern(
 
 \item{center_coord}{Center coordinates for hotspots}
 
-\item{center_param}{Hotspot expression level. A scalar is reused for every
-requested gene and cell type; when omitted, a separate value is sampled
-for each gene-cell-type combination.}
+\item{center_param}{Center parameters}
 
-\item{background_param}{Background expression level. A scalar is reused for
-every requested gene and cell type; when omitted, a separate value is
-sampled for each gene-cell-type combination.}
+\item{background_param}{Background parameters}
 
 \item{hot_spot_size}{Hotspot sizes}
 
@@ -59,10 +55,7 @@ sampled for each gene-cell-type combination.}
 types, or a named list with one vector per cell type.}
 }
 \value{
-Named list of spot-by-gene mean matrices, one per cell type. Thus
-each entry represents the full set of gene-, cell-type-, and
-location-specific means even though each pattern is constructed from
-scalar foreground and background levels.
+Named list of spot-by-gene mean matrices, one per cell type.
 }
 \description{
 Generate gene expression patterns

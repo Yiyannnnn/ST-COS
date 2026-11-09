@@ -42,9 +42,7 @@ generate_pattern(
 
 \item{layer_param}{Layer parameters}
 
-\item{seed}{Retained for backward compatibility. \code{generate_pattern()} is
-deterministic once its pattern parameters are supplied and does not alter
-the random-number generator state.}
+\item{seed}{Random seed}
 }
 \value{
 Vector of expression values

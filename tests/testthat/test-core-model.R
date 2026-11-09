@@ -50,20 +50,6 @@ test_that("Cholesky sampling targets the requested latent correlation", {
   expect_equal(stats::cor(t(latent))[1, 2], 0.55, tolerance = 0.03)
 })
 
-test_that("matrix repair reports the declared uniform eigenvalue shift", {
-  rho <- matrix(-0.75, nrow = 3, ncol = 3)
-  diag(rho) <- 1
-  repaired <- STCOS:::makespd(
-    rho, epsilon = 1e-4, return_diagnostics = TRUE
-  )
-
-  expect_equal(repaired$diagnostics$n_eigenvalues_below_floor, 1)
-  expect_equal(repaired$diagnostics$n_eigenvalues_modified, 3)
-  expect_equal(repaired$diagnostics$minimum_eigenvalue_lift, 0.5001)
-  expect_equal(repaired$diagnostics$uniform_eigenvalue_shift, 0.5001)
-  expect_gt(min(eigen(repaired$rho, symmetric = TRUE)$values), 0)
-})
-
 test_that("reference fitting exposes reviewed defaults and returns dispersion", {
   set.seed(3)
   expression <- matrix(
@@ -86,7 +72,6 @@ test_that("reference fitting exposes reviewed defaults and returns dispersion", 
   expect_length(fitted$theta_g$CT, nrow(expression))
   expect_true(all(c(
     "min_eigen_before", "min_eigen_after", "minimum_eigenvalue_lift",
-    "uniform_eigenvalue_shift", "n_eigenvalues_below_floor",
     "n_eigenvalues_modified", "relative_frobenius_perturbation",
     "maximum_entrywise_change", "epsilon"
   ) %in% names(fitted$matrix_diagnostics)))
@@ -103,36 +88,6 @@ test_that("gene-pattern generation does not rely on a global gene count", {
 
   expect_equal(dim(means$CT), c(4, 2))
   expect_equal(unname(means$CT[, "g2"]), c(2, 2, 8, 8))
-})
-
-test_that("gene-pattern seeds control every gene without inner resets", {
-  coordinates <- expand.grid(x_coord = 1:10, y_coord = 1:10)
-  patterns <- data.frame(
-    CT = rep("hot_spot", 4), row.names = paste0("g", 1:4)
-  )
-
-  first_spot <- sapply(1:10, function(seed) {
-    generate_gene_pattern(coordinates, patterns, seed = seed)$CT[1, ]
-  })
-
-  expect_true(all(apply(first_spot, 1, function(x) length(unique(x)) > 1L)))
-  expect_equal(
-    generate_gene_pattern(coordinates, patterns, seed = 4),
-    generate_gene_pattern(coordinates, patterns, seed = 4)
-  )
-})
-
-test_that("deterministic pattern construction does not reset the RNG", {
-  coordinates <- expand.grid(x_coord = 1:3, y_coord = 1:3)
-  set.seed(17)
-  state_before <- .Random.seed
-  generate_pattern(
-    coordinates, "hot_spot",
-    center_coord = data.frame(x_coord = 2, y_coord = 2),
-    center_param = 10, background_param = 2, hot_spot_size = 2
-  )
-
-  expect_identical(.Random.seed, state_before)
 })
 
 test_that("image-guided app launcher exposes the hosted application", {
