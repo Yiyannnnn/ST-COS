@@ -1,8 +1,10 @@
 Package: STCOS
 Title: Spatial Transcriptomics Cell-type Oriented Simulator
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: 
     person("Yiyan", "Zhang", , "yiyan@unc.edu", role = c("aut", "cre"))
+Author: Yiyan Zhang [aut, cre]
+Maintainer: Yiyan Zhang <yiyan@unc.edu>
 Description: A simulator for spatial transcriptomics data with configurable
     spatial patterns, cell-type-specific expression profiles, and explicit
     latent Gaussian pairwise-dependence parameters. Realized count-scale

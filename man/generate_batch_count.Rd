@@ -9,7 +9,9 @@ generate_batch_count(true_count, p0, celltype_proportion, seq_depth)
 \arguments{
 \item{true_count}{True count matrices}
 
-\item{p0}{Dropout probability}
+\item{p0}{Per-molecule binomial thinning probability. Each input count \code{n}
+is replaced by a \code{Binomial(n, 1 - p0)} draw. This operation can increase
+the observed zero proportion but is not a zero-inflated mixture model.}
 
 \item{celltype_proportion}{Cell type proportions}
 

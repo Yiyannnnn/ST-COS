@@ -1,0 +1,12 @@
+analysis	unit	seed_or_rule	status
+S1	replicates 1-5	10000 + replicate	frozen revision seed; not a recovered historical seed
+S2	replicates 1-5	20000 + replicate	frozen revision seed; historical output was reproduced separately with seed 123
+S3	replicates 1-5	30000 + replicate	frozen revision seed; not a recovered historical seed
+S4	replicates 1-5	40000 + replicate	frozen revision seed; not a recovered historical seed
+S5	replicates 1-5	50000 + replicate	frozen revision seed; not a recovered historical seed
+S6	replicates 1-5	60000 + replicate	frozen revision seed; not a recovered historical seed
+S7	replicates 1-5	7100 + replicate	prespecified scenario seeds retained in the archived S7 generator
+DLPFC correlation pair sampling	each section	42	analysis seed
+DLPFC sensitivity	each section	20260909 + (section ID modulo 100000)	analysis seed
+count-correlation attenuation	factorial condition and replicate	set in simulate_count_correlation_attenuation.R	analysis seed
+SRTsim S7 downstream anchor	five replicates	20260902 plus script-defined offsets	analysis seed

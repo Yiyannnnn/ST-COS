@@ -1,0 +1,7 @@
+^\.git$
+^\.gitignore$
+^\.Rbuildignore$
+^\.\.Rcheck$
+^STCOS\.Rcheck$
+^STCOS_[0-9.]+\.tar\.gz$
+^reproducibility$

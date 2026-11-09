@@ -1,0 +1,21 @@
+component	version	role
+R	4.4.0	primary analysis language
+data.table	1.18.2.1	data input and summaries
+ggplot2	4.0.1	figures
+Matrix	1.7.3	sparse matrices
+mgcv	1.9.3	spatial mean fitting
+spdep	1.3.13	spatial-neighbor graphs and Moran statistics
+Seurat	5.4.0	DLPFC reference data
+SRTsim	0.99.8	reference-based comparator and independent-simulator anchor
+scDesign3	1.5.0	reference-based comparator
+SingleCellExperiment	1.28.1	scDesign3 input
+cowplot	1.2.0	multipanel figures
+CARD	1.1	deconvolution benchmark
+spacexr	2.2.1	RCTD deconvolution benchmark
+STdeconvolve	1.3.2	deconvolution benchmark
+BayesSpace	1.16.0	spatial-domain benchmark
+BASS	1.1.0.17	spatial-domain benchmark
+SPARK	1.1.1	SVG benchmark
+aricode	1.0.3	clustering metrics
+dplyr	1.1.4	data processing
+tidyr	1.3.2	data reshaping

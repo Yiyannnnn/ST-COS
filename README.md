@@ -194,13 +194,27 @@ specified through the reference-free workflow.
 - `generate_spot_count()` constructs a continuous abundance-weighted mixture
   of cell-type-specific spot profiles. It does not simulate or sum independent
   individual cells within a spot.
+- Spatial expression fields and cell-type composition fields are separately
+  controllable design inputs. Their independent specification is useful for
+  factorial stress tests, but it is not asserted to be a biological model of
+  tissue organization; users can couple them through shared regions,
+  covariates, annotations, or image masks.
+- `generate_gene_pattern()` returns one spot-by-gene mean matrix per cell type.
+  Scalar foreground or background inputs are broadcast by request, whereas
+  omitted levels are sampled separately for each gene-cell-type combination.
+- `generate_batch_count()` applies per-molecule binomial thinning. It may
+  increase the observed zero proportion but does not fit or simulate a
+  zero-inflated mixture distribution.
 - `eigen_floor = 1e-6` is the default numerical floor used when repairing a
-  latent correlation matrix before Cholesky factorization.
+  latent correlation matrix before Cholesky factorization. When the minimum
+  eigenvalue is below the floor, ST-COS adds the minimum uniform shift needed
+  to bring it to the floor, then renormalizes the matrix to unit diagonal.
 
 ## Documentation and support
 
 - [Full tutorial](https://yiyannnnn.github.io/STCOS_tutorial/)
 - [Tutorial source](https://github.com/Yiyannnnn/STCOS_tutorial)
+- [Manuscript reproducibility code](reproducibility/README.md)
 - [Report a problem or request a feature](https://github.com/Yiyannnnn/ST-COS/issues)
 - In R, run `help(package = "STCOS")` or `?generate_true_count` for function
   documentation.
