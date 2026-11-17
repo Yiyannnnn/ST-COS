@@ -225,50 +225,6 @@ specified through the reference-free workflow.
 | Cell-type proportions | Spot-by-cell-type matrix; every row must sum to one |
 | Dependence parameters | Gene-by-gene matrix or array containing one matrix per cell type |
 
-## Model interpretation
-
-- The supplied dependence matrix controls **latent Gaussian pairwise
-  correlation**. Realized Pearson and Spearman correlations among simulated
-  counts may be attenuated by negative-binomial discretization, sparsity, and
-  spot-level mixing.
-- `generate_spot_count()` constructs a continuous abundance-weighted mixture
-  of cell-type-specific spot profiles. It does not simulate or sum independent
-  individual cells within a spot.
-- Spatial expression fields and cell-type composition fields are separately
-  controllable design inputs. Their independent specification is useful for
-  factorial stress tests, but it is not asserted to be a biological model of
-  tissue organization; users can couple them through shared regions,
-  covariates, annotations, or image masks.
-- `generate_cell_prop()` treats `layer_param` as layer-by-cell-type mean
-  logits, draws one Gaussian-perturbed logit per layer and cell type
-  (`noise_sd = 1e-4` by default), and converts them to proportions with a
-  softmax.
-- `generate_gene_pattern()` returns one spot-by-gene mean matrix per cell type.
-  Scalar foreground or background inputs are broadcast by request, whereas
-  omitted levels are sampled separately for each gene-cell-type combination.
-- `generate_batch_count()` applies per-molecule binomial thinning. It may
-  increase the observed zero proportion but does not fit or simulate a
-  zero-inflated mixture distribution.
-- `generate_batch_count()` thins each cell-type profile binomially;
-  `generate_spot_count(seq_depth = )` resamples any mixed spot whose total
-  exceeds the depth threshold to exactly that total (multinomial).
-- `generate_covariance_group()` builds blocks with a matrix exponential; the
-  implied latent correlations are close to one. Supply your own correlation
-  matrices, as in the quick start, to set specific values.
-- `generate_coordinates()` and `generate_gene_pattern()` reset the global
-  random-number generator only when `seed` is supplied; otherwise call
-  `set.seed()` once before a simulation.
-- `get_real_param()` refits genes with significant positive spatial
-  autocorrelation (one-sided Moran's I tests, BH-adjusted P <= 0.05), caps
-  every negative-binomial size at `dispersion_cap = 1e6`, and returns
-  library-normalized means with the observed library sizes; pass
-  `library_size` to `generate_true_count()` to apply them.
-- `eigen_floor = 1e-6` is the default numerical floor used when repairing a
-  latent correlation matrix before Cholesky factorization. Eigenvalues below
-  the floor are individually clipped to the floor before the matrix is
-  reconstructed and renormalized to unit diagonal.
-- Reference-based estimation uses a randomized discrete PIT on the interval
-  `[F(y - 1), F(y)]`; for a zero count, the lower endpoint is `F(-1) = 0`.
 
 ## Documentation and support
 
