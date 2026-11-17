@@ -4,7 +4,7 @@
 \name{STCOS-package}
 \alias{STCOS}
 \alias{STCOS-package}
-\title{ST-COS: Spatial Transcriptomics Cell-type Oriented Simulator}
+\title{ST-COS: Simulator of Spatial Transcriptomic Data Preserving Gene-Gene Co-Expression Patterns}
 \description{
 A simulator for spatial transcriptomics data with configurable spatial patterns, cell-type-specific expression profiles, and explicit latent Gaussian pairwise-dependence parameters. Realized count-scale dependence is generated through negative-binomial marginals and is not assumed to equal the latent target.
 }

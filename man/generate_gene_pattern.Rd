@@ -18,52 +18,63 @@ generate_gene_pattern(
   layer_param = NULL,
   all_lower_mean = 10,
   all_upper_mean = 150,
-  seed = 1,
+  seed = NULL,
   layer_assignments = NULL
 )
 }
 \arguments{
-\item{coord}{Coordinates data.table}
+\item{coord}{Coordinates data.table with \code{x_coord} and \code{y_coord}.}
 
-\item{gene_pattern}{Gene pattern specifications}
+\item{gene_pattern}{Data frame with one row per gene and one column per
+cell type.}
 
-\item{center_coord}{Center coordinates for hotspots}
+\item{center_coord}{Named list with one data frame of hotspot centers per
+cell type (one row per hotspot gene); defaults to the domain center.}
 
-\item{center_param}{Hotspot expression level. A scalar is reused for every
-requested gene and cell type; when omitted, a separate value is sampled
-for each gene-cell-type combination.}
+\item{center_param}{Hotspot center level.}
 
-\item{background_param}{Background expression level. A scalar is reused for
-every requested gene and cell type; when omitted, a separate value is
-sampled for each gene-cell-type combination.}
+\item{background_param}{Background level for hotspots and streaks.}
 
-\item{hot_spot_size}{Hotspot sizes}
+\item{hot_spot_size}{Hotspot radius \eqn{r}.}
 
-\item{streak_x}{Streak x positions}
+\item{streak_x}{Streak position \eqn{s} on the x axis.}
 
-\item{streak_x_param}{Streak parameters}
+\item{streak_x_param}{Streak level.}
 
-\item{streak_size}{Streak sizes}
+\item{streak_size}{Streak width \eqn{w} (half-width \eqn{w/2}).}
 
-\item{layer}{Layer assignments}
+\item{layer}{Layer labels shared by all cell types (see also
+\code{layer_assignments}).}
 
-\item{layer_param}{Layer parameters}
+\item{layer_param}{Layer means \eqn{\ell_{i,g,c}}: a vector with one mean
+per layer shared by the layer-pattern genes of a cell type, or, inside a
+named list by cell type, a matrix with one row per gene (or per
+layer-pattern gene) and one column per layer. Sampled from
+\eqn{U(0, 150)} per gene when omitted.}
 
-\item{all_lower_mean}{Lower bound for mean}
+\item{all_lower_mean, all_upper_mean}{Bounds \eqn{[\alpha_{g,c},
+  \beta_{g,c}]} of the uniform distribution used for \code{"no_pattern"} genes;
+scalars or per-gene and per-cell-type values as described above.}
 
-\item{all_upper_mean}{Upper bound for mean}
-
-\item{seed}{Random seed}
+\item{seed}{Optional seed passed to \code{\link[=set.seed]{set.seed()}} before any draw. \code{NULL}
+(the default) uses the current random-number state. Supplying a seed
+resets the global random-number generator.}
 
 \item{layer_assignments}{Optional vector of layer labels shared by cell
 types, or a named list with one vector per cell type.}
 }
 \value{
-Named list of spot-by-gene mean matrices, one per cell type. Thus
-each entry represents the full set of gene-, cell-type-, and
-location-specific means even though each pattern is constructed from
-scalar foreground and background levels.
+Named list of spot-by-gene mean matrices, one per cell type.
 }
 \description{
-Generate gene expression patterns
+Builds the spatial mean surface \eqn{\mu_{g,c}(x, y)} for every gene and
+cell type. Each gene-cell-type entry of \code{gene_pattern} is one of
+\code{"hotspot"} (or \code{"hot_spot"}), \code{"streak"}, \code{"layer"}, or \code{"no_pattern"}.
+}
+\details{
+Pattern parameters can be given as one scalar for all genes and cell types,
+a vector with one value per gene (or per gene carrying that pattern), a data
+frame or matrix with one column per cell type, or a named list with one
+entry per cell type. Omitted levels are sampled separately for each
+gene-cell-type combination.
 }

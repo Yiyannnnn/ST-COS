@@ -2,6 +2,18 @@ library(data.table)
 library(ggplot2)
 library(stringr)
 
+local({
+  a <- commandArgs(trailingOnly = FALSE)
+  f <- sub("^--file=", "", a[grepl("^--file=", a)])
+  here <- if (length(f) == 1L) dirname(normalizePath(f)) else getwd()
+  rules <- c(Sys.getenv("STCOS_EVALUATION_RULES"),
+             file.path(here, "..", "evaluation_rules.R"),
+             file.path(getwd(), "evaluation_rules.R"))
+  rules <- rules[nzchar(rules) & file.exists(rules)]
+  if (!length(rules)) stop("Cannot find evaluation_rules.R; set STCOS_EVALUATION_RULES.")
+  source(rules[1L], local = globalenv())
+})
+
 base_dir <- "."
 
 method_order <- c(
@@ -36,31 +48,12 @@ get_reps <- function(scenario) {
   reps
 }
 
+# Truth sets are shared with the other evaluators (evaluation_rules.R).
+# Significance calls are made inside each runner at FDR 0.05.
 get_truth_sets <- function(scenario, rep_id) {
-  truth_file <- file.path(base_dir, "Data", paste0(scenario, "_gene"), "simulated", paste0(scenario, "_marker_gene_truth.csv"))
-  if (file.exists(truth_file)) {
-    truth_dt <- fread(truth_file)
-    if (!("cell_type" %in% colnames(truth_dt)) || !("gene_id" %in% colnames(truth_dt))) {
-      return(NULL)
-    }
-    if ("scenario" %in% colnames(truth_dt)) {
-      truth_dt <- truth_dt[scenario == rep_id]
-    }
-    if (nrow(truth_dt) > 0) {
-      return(split(unique(truth_dt$gene_id), truth_dt$cell_type))
-    }
-  }
-  if (scenario %in% c("S2", "S5")) {
-    return(list(ct1 = character(0), ct2 = character(0), ct3 = character(0)))
-  }
-  if (scenario %in% c("S1", "S3", "S4", "S6")) {
-    return(list(
-      ct1 = paste0("gene_", 1:5),
-      ct2 = paste0("gene_", 6:10),
-      ct3 = paste0("gene_", 11:15)
-    ))
-  }
-  stop("No CT-SVG truth definition found for ", scenario, " replicate ", rep_id, ".")
+  sets <- ctsvg_truth_sets(sim_dir_for(base_dir, scenario), scenario, rep_id)
+  if (is.null(sets)) stop("No CT-SVG truth definition found for ", scenario, " replicate ", rep_id, ".")
+  sets
 }
 
 get_gene_universe <- function(scenario, rep_id) {

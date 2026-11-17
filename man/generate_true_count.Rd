@@ -2,7 +2,7 @@
 % Please edit documentation in R/simulation.R
 \name{generate_true_count}
 \alias{generate_true_count}
-\title{Generate true count matrix}
+\title{Generate cell-type-specific spot-level expression profiles}
 \usage{
 generate_true_count(
   coord,
@@ -11,33 +11,59 @@ generate_true_count(
   cov_gene = NULL,
   lib_size = NULL,
   theta_g = NULL,
+  library_size = NULL,
   eigen_floor = 1e-06,
   num_Core = NULL
 )
 }
 \arguments{
-\item{coord}{Coordinate matrix}
+\item{coord}{Coordinate matrix or data frame with one row per spot.}
 
-\item{mean_param}{List of mean parameters}
+\item{mean_param}{Named list of non-negative spot-by-gene mean matrices,
+one per cell type.}
 
-\item{gene_relationship}{Gene relationship matrix}
+\item{gene_relationship}{Data frame or matrix with one row per gene and one
+column per cell type; non-missing entries mark the genes that enter the
+copula for that cell type.}
 
-\item{cov_gene}{Gene covariance array}
+\item{cov_gene}{Latent covariance or correlation input for correlated genes:
+one gene-by-gene matrix shared by all cell types, a gene-by-gene-by-cell
+type array, or a named list of per-cell-type matrices such as the output
+of \code{\link[=generate_covariance]{generate_covariance()}}. It is converted to a correlation matrix with
+\code{\link[stats:cor]{stats::cov2cor()}}.}
 
-\item{lib_size}{Library sizes}
+\item{lib_size}{Legacy spot-specific negative-binomial size \eqn{s_j}, used
+for every gene when \code{theta_g} is omitted. It is a dispersion parameter,
+not a library size. Supply one vector shared by all cell types or a named
+list with one vector per cell type. When both \code{lib_size} and \code{theta_g} are
+omitted, \eqn{s_j = \max\{1, |\mathrm{round}(s_j^*)|\}} with
+\eqn{s_j^* \sim N(1000, 50^2)}.}
 
 \item{theta_g}{Optional named list of gene-specific negative-binomial size
-vectors, one per cell type. When omitted, \code{lib_size} is retained as the
-legacy size parameter.}
+vectors, one per cell type. When supplied, it is used instead of
+\code{lib_size}.}
+
+\item{library_size}{Optional observed library sizes \eqn{L_j}, one value
+per spot (or a named list with one vector per cell type). Each spot's
+means are multiplied by \eqn{f_j = L_j / \bar L}, as for the
+library-normalized means returned by \code{\link[=get_real_param]{get_real_param()}}.}
 
 \item{eigen_floor}{Minimum eigenvalue used to repair latent correlation
 matrices before Cholesky factorization.}
 
-\item{num_Core}{Number of cores for parallel processing}
+\item{num_Core}{Unused; retained for backward compatibility.}
 }
 \value{
-List of count matrices per cell type
+Named list of spot-by-gene expression matrices, one per cell type.
+Each matrix represents a latent cell-type-specific average expression
+profile at each spot, not counts from independently sampled individual
+cells.
 }
 \description{
-Generate true count matrix
+Draws one negative-binomial expression profile per cell type and spot.
+Genes flagged in \code{gene_relationship} share a Gaussian copula: their latent
+correlation matrix is repaired with \code{\link[=makespd]{makespd()}} (individual eigenvalue
+clipping), factorized with \code{\link[=chol]{chol()}}, and the resulting uniforms are mapped
+through the negative-binomial inverse CDF. Other genes are drawn
+independently.
 }

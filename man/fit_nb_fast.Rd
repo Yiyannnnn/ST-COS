@@ -9,9 +9,10 @@ fit_nb_fast(y, dispersion_cap = 1e+06)
 \arguments{
 \item{y}{Vector of counts.}
 
-\item{dispersion_cap}{Finite approximation to the Poisson boundary used
-when the empirical variance is no larger than the mean. Set to \code{Inf} to
-use the explicit Poisson limit.}
+\item{dispersion_cap}{Upper bound on the negative-binomial size
+\eqn{\theta}; also used when the empirical variance is no larger than
+the mean (Poisson boundary). Set to \code{Inf} for no cap and the explicit
+Poisson limit.}
 }
 \value{
 Named vector with mu and theta parameters

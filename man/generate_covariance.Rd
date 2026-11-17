@@ -2,16 +2,24 @@
 % Please edit documentation in R/covariance.R
 \name{generate_covariance}
 \alias{generate_covariance}
-\title{Generate covariance matrix for genes}
+\title{Generate random latent covariance blocks for genes}
 \usage{
 generate_covariance(gene_relationship)
 }
 \arguments{
-\item{gene_relationship}{Matrix indicating gene relationships}
+\item{gene_relationship}{Data frame with one row per gene and one column
+per cell type.}
 }
 \value{
-List of covariance matrices per cell type
+Named list of gene-by-gene covariance matrices, one per cell type,
+accepted directly by \code{\link[=generate_true_count]{generate_true_count()}}. To impose specific latent
+correlation values, supply correlation matrices to
+\code{\link[=generate_true_count]{generate_true_count()}} instead.
 }
 \description{
-Generate covariance matrix for genes
+For each cell type, the genes with non-missing \code{gene_relationship} entries
+form one block. The block is the matrix exponential, \code{\link[expm:expm]{expm::expm()}}, of
+\eqn{A + A^\top} with \eqn{A_{ij} \sim N(0, 1)}, which is positive
+definite. Correlations can be positive or negative. The diagonal of the
+remaining genes is \eqn{|N(0, 1)|}.
 }

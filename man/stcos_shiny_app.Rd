@@ -10,8 +10,13 @@ stcos_shiny_app()
 A \code{shiny.appobj} created by \code{\link[shiny:shinyApp]{shiny::shinyApp()}}.
 }
 \description{
-Creates a local Shiny application for designing simulation coordinates from
-an uploaded histology image, an uploaded coordinate table, image clicks, or
-a generated grid, hexagonal, or random layout. Coordinates can be previewed
-over the image and downloaded for use in a reference-free simulation.
+Creates a local coordinate designer: simulation coordinates come from an
+uploaded coordinate table (for example, centroids from an external
+segmentation), image clicks, or a generated grid, hexagonal, or random
+layout. Generated layouts are placed on an uploaded histology image without
+changing their aspect ratio. With an image loaded, uploaded and clicked
+coordinates are read as image pixels, and the downloaded table uses a y-up
+frame in pixel units. Image segmentation, gene patterns, cell-type
+composition, and dependence settings are available in the hosted
+application (\code{\link[=launch_stcos_app]{launch_stcos_app()}}).
 }

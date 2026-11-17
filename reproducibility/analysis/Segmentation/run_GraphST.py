@@ -1,6 +1,7 @@
 #!/usr/bin/env conda run -n STCOS_eval python
 import torch
 import argparse
+import os
 import scanpy as sc
 import sys
 sys.path.append('./Segmentation/GraphST')
@@ -17,6 +18,7 @@ parser.add_argument('S', type=str, help="The dataset identifier (e.g., S1).")
 parser.add_argument('suffix', type=str, help="The suffix for file naming (e.g., _1).")
 parser.add_argument('--radius', type=int, default=50, help="Neighborhood radius used in GraphST refinement.")
 args = parser.parse_args()
+method_seed = int(os.environ.get("STCOS_METHOD_SEED", "41"))
 
 # Dynamically create file paths
 data_f = f'./Data/{args.S}_gene/simulated/' 
@@ -48,7 +50,7 @@ print(adata)
 adata.var_names_make_unique()
 
 # Initialize the GraphST model
-model = GraphST.GraphST(adata, device=device)
+model = GraphST.GraphST(adata, device=device, random_seed=method_seed)
 
 # Train the model
 adata = model.train()

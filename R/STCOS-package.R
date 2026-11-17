@@ -1,4 +1,4 @@
-#' ST-COS: Spatial Transcriptomics Cell-type Oriented Simulator
+#' ST-COS: Simulator of Spatial Transcriptomic Data Preserving Gene-Gene Co-Expression Patterns
 #'
 #' @keywords internal
 #' @importFrom expm expm

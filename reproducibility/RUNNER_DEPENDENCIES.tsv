@@ -1,0 +1,29 @@
+method	runner	environment	direct_packages	source_pins
+BASS	analysis/Segmentation/BASS.R	R-4.4-downstream	BASS==1.1.0.017;data.table==1.18.2.1;tidyverse==2.0.0;aricode==1.0.3	BASS@5c2690fddcdeb12461a69106ff4681777d0a8822
+BAYESSPACE	analysis/Segmentation/BayesSpace.R	R-4.4-downstream	BayesSpace==1.16.0;SingleCellExperiment==1.28.1;data.table==1.18.2.1;tidyverse==2.0.0	Bioconductor-3.20
+MAPLE	analysis/Segmentation/MAPLE.R	R-4.4-downstream	maple==0.99.1;spruce==0.99.0;Seurat==5.4.0;mclust==6.1.1;data.table==1.18.2.1;tidyverse==2.0.0;ggplot2==4.0.1	maple@b173e89a7bc82c6ae09c7e0709d09ed22082172d;spruce@08111d41edcc1a21455bd61ad276d26fc5193597
+STAGATE	analysis/Segmentation/STAGATE.py	Python-STCOS-evaluation	STAGATE_pyG==1.0.0;torch==1.13.1+cpu;torch-geometric==2.6.1;scanpy==1.9.8;pandas==1.5.3;numpy==1.21.6;matplotlib==3.6.3;scikit-learn==1.1.3	STAGATE_pyG@ae1158ca8cf1eb6bb8ee198298552d44c9ac21db
+GRAPHST	analysis/Segmentation/run_GraphST.py	Python-STCOS-evaluation	GraphST==1.1.1;torch==1.13.1+cpu;scanpy==1.9.8;pandas==1.5.3;numpy==1.21.6	PyPI
+SPAGCN	analysis/Segmentation/run_SpaGCN.py	Python-STCOS-evaluation	SpaGCN==1.2.7;torch==1.13.1+cpu;scanpy==1.9.8;pandas==1.5.3;numpy==1.21.6	PyPI
+CARD	analysis/Deconvolution/CARD.R	R-4.4-downstream	CARD==1.1;data.table==1.18.2.1;tidyverse==2.0.0;Matrix==1.7-3;SummarizedExperiment==1.36.0	CARD@2d64b91abb5cdd0c7f576b1c5d4727c84e7c93a0
+RCTD	analysis/Deconvolution/RCTD.R	R-4.4-downstream	spacexr==2.2.1;Matrix==1.7-3;tidyverse==2.0.0;data.table==1.18.2.1	spacexr@698d5b09e6f70d75d7a5284cf90f8ba4adcb7205
+STDECONVOLVE	analysis/Deconvolution/STdeconvolve.R	R-4.4-downstream	STdeconvolve==1.3.2;data.table==1.18.2.1;tidyverse==2.0.0	STdeconvolve@13b1953263a5ce34e2471c4defebedbda44c7d08
+TANGRAM	analysis/Deconvolution/Tangram.py	Python-STCOS-evaluation	tangram-sc==1.0.4;anndata==0.8.0;numpy==1.21.6;pandas==1.5.3;torch==1.13.1+cpu	PyPI
+POLARIS	analysis/Deconvolution/POLARIS.py	Python-POLARIS	python-polaris-requirements.txt	POLARIS base commit and patch in environment/restore_external_repositories.sh
+STDGCN	analysis/Deconvolution/run_STdGCN.py	Python-STCOS-evaluation	python-evaluation-requirements.txt	STdGCN base commit and patch in environment/restore_external_repositories.sh
+HEARTSVG	analysis/SVG_detection/HEARTSVG.R	R-4.4-downstream	HEARTSVG==1.1.0;data.table==1.18.2.1	HEARTSVG@7e2f68986c6b7dc5a083f53b4f93566d4f451149
+SPARK	analysis/SVG_detection/SPARK.R	R-4.4-downstream	SPARK==1.1.1;data.table==1.18.2.1	SPARK@a8b4bf27b804604dfda53da42992f100b8e4e727
+SPATIALDE_MSC	analysis/SVG_detection/SpatialDE_MSC.py	Python-STCOS-evaluation	squidpy==1.2.3;anndata==0.8.0;SpatialDE==1.1.3;numpy==1.21.6;pandas==1.5.3	PyPI
+SPATIALDE2	analysis/SVG_detection/run_SpatialDE.py	Python-STCOS-evaluation	SpatialDE==1.1.3;NaiveDE==1.2.0;numpy==1.21.6;pandas==1.5.3;scipy==1.9.3	PyPI
+CELINA	analysis/CT_SVG/CELINA.R	R-4.4-downstream	CELINA==1.0;CARD==1.1;data.table==1.18.2.1	CELINA@305f57958acace00811caea6bd9a92514249182c;CARD@2d64b91abb5cdd0c7f576b1c5d4727c84e7c93a0
+CSIDE	analysis/CT_SVG/CSIDE.R	R-4.4-downstream	spacexr==2.2.1;Matrix==1.7-3;data.table==1.18.2.1	spacexr@698d5b09e6f70d75d7a5284cf90f8ba4adcb7205
+CTSV	analysis/CT_SVG/CTSV.R	R-4.4-downstream	CTSV==0.99.9;SpatialExperiment==1.18.1;spacexr==2.2.1;Matrix==1.7-3;data.table==1.18.2.1	CTSV@99fe2fb821a82614856cfaa82a7235896f314e7d;spacexr@698d5b09e6f70d75d7a5284cf90f8ba4adcb7205
+STANCE	analysis/CT_SVG/STANCE.R	R-4.4-downstream	STANCE==0.3.0;data.table==1.18.2.1	STANCE@f7a80200b89c7cd89b19a5b91aafc022bbdf97f3
+SPVC	analysis/CT_SVG/spVC.R	R-4.4-downstream	spVC==0.1.0;sp==2.2-0;BPST==1.1.0;Triangulation==1.0.0;MGLM==0.2.1;data.table==1.18.2.1	spVC@a81c24372cd9667b925e2f37c4a720152d890545;BPST@26105be0fb1e174c0a53e5fa9224f1f05c84cdc6;Triangulation@425cce346c948e4336466ffef15dee5463843fd8
+SPMOCA	analysis/coexpression/spMOCA.R	R-4.4-downstream	spMOCA==1.0;data.table==1.18.2.1	spMOCA@e6a1e1f2463a6a8c52cab4368295cac7ea7667ec
+CSSN	analysis/coexpression/CSSN.R	R-4.4-downstream	CSSN==0.99.1;data.table==1.18.2.1;Matrix==1.7-3;ggplot2==4.0.1;pheatmap==1.0.12	CSSN@0b5b2b414d5bb16fc5f5377a84f138cf19635c16
+STIHC	analysis/coexpression/stIHC.R	R-4.4-downstream	data.table==1.18.2.1;tidyverse==2.0.0;fda==6.3.0;fdaPDE==1.1-21;mclust==6.1.1;clusterCrit==1.3.0;cluster==2.1.8.1	included implementation pinned by package release commit
+BINSPECT	analysis/coexpression/binSpect.R	R-4.4-downstream	Giotto==1.1.2;data.table==1.18.2.1;tidyverse==2.0.0;Matrix==1.7-3	Giotto@d64b203b45af6c1214e80ed922012295668498a0
+HDWGCNA	analysis/coexpression/hdWGCNA.R	R-4.4-downstream	hdWGCNA==0.4.06;Seurat==5.4.0;SeuratObject==5.3.0;WGCNA==1.73;data.table==1.18.2.1;tidyverse==2.0.0;Matrix==1.7-3;patchwork==1.3.2;ggplot2==4.0.1	hdWGCNA@0aad03cff892e7ae641d616cd7dfa4331fcd5a04
+SMOOTHIE	analysis/coexpression/smoothie.py	Python-STCOS-evaluation	numpy==1.21.6	included implementation pinned by package release commit
+SPACEX	analysis/coexpression/SpaceX.R	R-4.1-SpaceX	SpaceX==0.1.0;data.table==1.14.8;tidyverse==1.3.2	SpaceX@262a7a55a60ae42b1e966c3ea684d80a6ac4ad04

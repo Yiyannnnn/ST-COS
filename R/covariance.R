@@ -1,7 +1,17 @@
-#' Generate covariance matrix for genes
-#' 
-#' @param gene_relationship Matrix indicating gene relationships
-#' @return List of covariance matrices per cell type
+#' Generate random latent covariance blocks for genes
+#'
+#' For each cell type, the genes with non-missing `gene_relationship` entries
+#' form one block. The block is the matrix exponential, [expm::expm()], of
+#' \eqn{A + A^\top} with \eqn{A_{ij} \sim N(0, 1)}, which is positive
+#' definite. Correlations can be positive or negative. The diagonal of the
+#' remaining genes is \eqn{|N(0, 1)|}.
+#'
+#' @param gene_relationship Data frame with one row per gene and one column
+#'   per cell type.
+#' @return Named list of gene-by-gene covariance matrices, one per cell type,
+#'   accepted directly by [generate_true_count()]. To impose specific latent
+#'   correlation values, supply correlation matrices to
+#'   [generate_true_count()] instead.
 #' @export
 generate_covariance <- function(gene_relationship) {
   cov_matrix = list()
@@ -19,10 +29,24 @@ generate_covariance <- function(gene_relationship) {
   return(cov_matrix)
 }
 
-#' Generate group-based covariance matrix
-#' 
-#' @param gene_relationship Matrix indicating gene group relationships
-#' @return Array of covariance matrices
+#' Generate group-based latent covariance blocks
+#'
+#' For each cell type and each group label in `gene_relationship`, the genes
+#' carrying that label form one block: the matrix exponential, [expm::expm()],
+#' of \eqn{A + A^\top} with \eqn{A_{ij} = |Z_{ij}|} and
+#' \eqn{Z_{ij} \sim N(0, 1)}. Blocks are positive definite with positive
+#' entries; genes in different groups are uncorrelated. Because the matrix
+#' exponential is dominated by its leading eigenvector, the implied latent
+#' correlations are close to one (median about 0.997 for five-gene blocks),
+#' and blocks of ten or more genes are numerically singular before the
+#' eigenvalue repair in [generate_true_count()]. To impose specific latent
+#' correlation values, supply correlation matrices to [generate_true_count()]
+#' instead.
+#'
+#' @param gene_relationship Data frame with one row per gene and one column
+#'   per cell type; entries are group labels, with `NA` for genes outside any
+#'   block.
+#' @return Gene-by-gene-by-cell-type covariance array.
 #' @export
 generate_covariance_group <- function(gene_relationship) {
   cov_matrix = array(rep(0,ncol(gene_relationship)*nrow(gene_relationship)*nrow(gene_relationship)),

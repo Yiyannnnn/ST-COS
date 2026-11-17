@@ -1,10 +1,18 @@
 #!/usr/bin/env Rscript
 
 suppressPackageStartupMessages({
-  library(STCOS)
   library(data.table)
   library(dplyr)
 })
+
+scenario_output_dir <- function(scenario) {
+  root <- Sys.getenv("STCOS_OUTPUT_ROOT", unset = "")
+  if (!nzchar(root)) {
+    return(file.path(".", "Data", paste0(scenario, "_gene"), "simulated"))
+  }
+  file.path(normalizePath(root, mustWork = FALSE),
+            paste0(scenario, "_gene"), "simulated")
+}
 
 args <- commandArgs(trailingOnly = TRUE)
 rep_id <- if (length(args) >= 1L) suppressWarnings(as.integer(args[1])) else 1L
@@ -355,7 +363,7 @@ marker_registry <- list()
 coexp_registry <- list()
 
 # Simulation driver ---------------------------------------------------------
-output_dir <- "./Data/S7_gene/simulated"
+output_dir <- scenario_output_dir("S7")
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 replicate_designs <- replicate_designs[vapply(
   replicate_designs, function(x) x$id == rep_id, logical(1)
@@ -366,7 +374,7 @@ if (length(replicate_designs) != 1L) {
 
 for (cfg in replicate_designs) {
   set.seed(cfg$seed)
-  coord <- generate_coordinates(
+  coord <- STCOS::generate_coordinates(
     x_len = 50,
     y_len = 50,
     pattern = "hex",
@@ -485,21 +493,20 @@ for (cfg in replicate_designs) {
   )
 
   gene_relationship_s <- copy(base_gene_relationship)
-  cov_gene <- generate_covariance_group(gene_relationship_s)
-  true_count <- generate_true_count(
+  cov_gene <- STCOS::generate_covariance_group(gene_relationship_s)
+  true_count <- STCOS::generate_true_count(
     coord,
     mean_param,
     gene_relationship = gene_relationship_s,
     cov_gene = cov_gene
   )
-  true_count <- generate_batch_count(
-    true_count, p0 = cfg$p0, celltype_proportion = prop_mat,
+  true_count <- STCOS::generate_batch_count(true_count, p0 = cfg$p0)
+  spot_count <- STCOS::generate_spot_count(
+    true_count = true_count,
+    nGenes = nGenes,
+    cell_number = rep(as.integer(cfg$cell_per_spot), n_spots),
+    celltype_proportion = prop_mat,
     seq_depth = cfg$seq_depth
-  )
-  spot_count <- aggregate_spot_counts_abundance_weighted(
-    count_list = true_count,
-    cell_numbers = rep(as.integer(cfg$cell_per_spot), n_spots),
-    celltype_prop = prop_mat
   )
 
   coord_dt <- as.data.table(coord)
@@ -615,10 +622,14 @@ for (cfg in replicate_designs) {
 
 if (length(marker_registry) > 0) {
   marker_summary <- rbindlist(marker_registry, fill = TRUE)
+  # Replicate jobs run separately, so each also writes its own truth file;
+  # the combined file is kept for legacy readers.
   fwrite(marker_summary, file = file.path(output_dir, "S7_marker_gene_truth.csv"))
+  fwrite(marker_summary, file = file.path(output_dir, sprintf("S7_marker_gene_truth_%d.csv", rep_id)))
 }
 
 if (length(coexp_registry) > 0) {
   coexp_summary <- rbindlist(coexp_registry, fill = TRUE)
   fwrite(coexp_summary, file = file.path(output_dir, "S7_coexpression_truth.csv"))
+  fwrite(coexp_summary, file = file.path(output_dir, sprintf("S7_coexpression_truth_%d.csv", rep_id)))
 }

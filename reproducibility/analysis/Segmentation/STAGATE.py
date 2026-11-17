@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -39,6 +40,7 @@ parser.add_argument(
     help="Radius cutoff when graph_model=Radius."
 )
 args = parser.parse_args()
+method_seed = int(os.environ.get("STCOS_METHOD_SEED", "0"))
 
 # Dynamically create file paths
 data_f = f'./Data/{args.S}_gene/simulated/{args.S}_'
@@ -79,7 +81,7 @@ else:
     print(f"Building spatial graph with Radius, rad_cutoff={args.rad_cutoff}")
     STAGATE_pyG.Cal_Spatial_Net(adata, model="Radius", rad_cutoff=args.rad_cutoff)
 
-adata = STAGATE_pyG.train_STAGATE(adata)
+adata = STAGATE_pyG.train_STAGATE(adata, random_seed=method_seed)
 
 # Perform clustering
 sc.pp.neighbors(adata, use_rep='STAGATE')

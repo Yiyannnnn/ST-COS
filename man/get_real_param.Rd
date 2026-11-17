@@ -2,50 +2,68 @@
 % Please edit documentation in R/statistics.R
 \name{get_real_param}
 \alias{get_real_param}
-\title{Main function to estimate real parameters}
+\title{Estimate reference-based simulation parameters}
 \usage{
 get_real_param(
   expr,
   coord,
   gene_names,
-  moran_thr = 0.15,
+  moran_thr = NULL,
   cor_thr = 0.05,
   block_size = 1024,
   n_cores = 1,
   eigen_floor = 1e-06,
   neighbor_k = 6,
   spline_k = 50,
-  dispersion_cap = 1e+06
+  dispersion_cap = 1e+06,
+  moran_alpha = 0.05
 )
 }
 \arguments{
-\item{expr}{Expression matrix}
+\item{expr}{Genes-by-spots count matrix.}
 
-\item{coord}{Coordinates data}
+\item{coord}{Data frame with \code{row} and \code{col} columns, one row per spot.}
 
-\item{gene_names}{Gene names}
+\item{gene_names}{Gene names.}
 
-\item{moran_thr}{Moran's I threshold}
+\item{moran_thr}{Optional minimum Moran's I applied in addition to the
+significance test; \code{NULL} (default) applies none.}
 
-\item{cor_thr}{Correlation threshold}
+\item{cor_thr}{Correlations with absolute value below this threshold are set
+to zero before repair.}
 
-\item{block_size}{Block size for processing}
+\item{block_size}{Number of genes per block in the randomized PIT.}
 
-\item{n_cores}{Number of cores for parallel processing}
+\item{n_cores}{Number of cores for the randomized PIT.}
 
-\item{eigen_floor}{Minimum eigenvalue used to repair the latent correlation
-matrix.}
+\item{eigen_floor}{Eigenvalue floor used to repair the latent correlation
+matrix by individual eigenvalue clipping.}
 
-\item{neighbor_k}{Number of nearest neighbors used for Moran's I.}
+\item{neighbor_k}{Number of nearest neighbours used for Moran's I.}
 
-\item{spline_k}{Basis dimension used by the thin-plate spline.}
+\item{spline_k}{Basis dimension of the thin-plate spline.}
 
-\item{dispersion_cap}{Finite negative-binomial size used at the Poisson
-boundary. Set to \code{Inf} for the explicit Poisson limit.}
+\item{dispersion_cap}{Upper bound on every negative-binomial size
+\eqn{\theta}, also used for genes whose sample variance does not exceed
+their mean. Set to \code{Inf} for no cap and the explicit Poisson limit.}
+
+\item{moran_alpha}{Significance level for the BH-adjusted Moran's I tests.}
 }
 \value{
-List of estimated parameters
+List with \code{mean_param} (library-normalized spot-by-gene means, list
+element \code{CT}), \code{library_size} (observed \eqn{L_j}), \code{theta_g}
+(gene-specific negative-binomial sizes), \code{gene_relationship}, \code{cov_gene}
+(repaired latent correlation matrix), \code{spatial_genes}, and
+\code{matrix_diagnostics}, ready for \code{\link[=generate_true_count]{generate_true_count()}}.
 }
 \description{
-Main function to estimate real parameters
+Fits negative-binomial moments for each gene, estimates one global latent
+correlation matrix from a randomized probability-integral transform,
+sparsifies and repairs it, selects genes with significant spatial
+autocorrelation (one-sided Moran's I test on a k-nearest-neighbour graph of
+the \code{row}/\code{col} grid, BH-adjusted), and refits those genes with a
+negative-binomial GAM with a library-size offset. The fitted means are
+returned normalized to the average library size together with the observed
+library sizes \eqn{L_j}; \code{\link[=generate_true_count]{generate_true_count()}} applies
+\eqn{f_j = L_j / \bar L} when \code{library_size} is supplied.
 }

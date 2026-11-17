@@ -10,7 +10,9 @@ prepare_input(
   mu_mat,
   gene_names,
   theta_g,
-  matrix_diagnostics = NULL
+  matrix_diagnostics = NULL,
+  library_size = NULL,
+  spatial_genes = character(0)
 )
 }
 \arguments{
@@ -25,10 +27,14 @@ prepare_input(
 \item{theta_g}{Gene-specific negative-binomial size parameters.}
 
 \item{matrix_diagnostics}{Diagnostics from correlation-matrix repair.}
+
+\item{library_size}{Observed library sizes \eqn{L_j}.}
+
+\item{spatial_genes}{Genes refitted with the NB-GAM.}
 }
 \value{
-List of mean parameters, dispersions, dependence parameters, and
-matrix-repair diagnostics.
+List of mean parameters, library sizes, dispersions, dependence
+parameters, spatial genes, and matrix-repair diagnostics.
 }
 \description{
 Prepare YZ input objects

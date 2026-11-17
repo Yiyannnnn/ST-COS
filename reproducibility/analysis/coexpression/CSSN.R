@@ -19,16 +19,10 @@ suppressPackageStartupMessages({
   library(pheatmap)
 })
 
-# Install CSSN if not already installed
-if (!require("CSSN", quietly = TRUE)) {
-  if (!require("devtools", quietly = TRUE)) {
-    install.packages("devtools", repos = "https://cran.r-project.org/")
-  }
-  devtools::install_github("jingeyu/CSSN")
-  library(CSSN)
-} else {
-  library(CSSN)
+if (!requireNamespace("CSSN", quietly = TRUE)) {
+  stop("CSSN is missing from the pinned downstream R environment.")
 }
+suppressPackageStartupMessages(library(CSSN))
 
 # Get command line arguments
 args <- commandArgs(trailingOnly = TRUE)
@@ -303,8 +297,8 @@ if (exists("Result_all") && !is.null(Result_all) && length(Result_all) > 0) {
   
   # Save networks in multiple formats
   for (i in 1:length(Result_all)) {
-    if (!is.null(Result_all[[i]]) && is.matrix(Result_all[[i]])) {
-      network_matrix <- Result_all[[i]]
+    if (!is.null(Result_all[[i]]) && (is.matrix(Result_all[[i]]) || inherits(Result_all[[i]], "Matrix"))) {
+      network_matrix <- as.matrix(Result_all[[i]])
       
       # Save as CSV
       write.csv(network_matrix, 
@@ -361,8 +355,8 @@ if (exists("Result_all") && !is.null(Result_all) && length(Result_all) > 0) {
     # Get dimensions from first valid network
     first_valid <- NULL
     for (i in 1:length(Result_all)) {
-      if (!is.null(Result_all[[i]]) && is.matrix(Result_all[[i]])) {
-        first_valid <- Result_all[[i]]
+      if (!is.null(Result_all[[i]]) && (is.matrix(Result_all[[i]]) || inherits(Result_all[[i]], "Matrix"))) {
+        first_valid <- as.matrix(Result_all[[i]])
         break
       }
     }
@@ -374,9 +368,9 @@ if (exists("Result_all") && !is.null(Result_all) && length(Result_all) > 0) {
       
       # Sum all valid networks
       for (i in 1:length(Result_all)) {
-        if (!is.null(Result_all[[i]]) && is.matrix(Result_all[[i]]) && 
+        if (!is.null(Result_all[[i]]) && (is.matrix(Result_all[[i]]) || inherits(Result_all[[i]], "Matrix")) &&
             nrow(Result_all[[i]]) == n_genes && ncol(Result_all[[i]]) == n_genes) {
-          mean_network <- mean_network + Result_all[[i]]
+          mean_network <- mean_network + as.matrix(Result_all[[i]])
           valid_count <- valid_count + 1
         }
       }
@@ -431,8 +425,8 @@ if (exists("Result_all") && !is.null(Result_all) && length(Result_all) > 0) {
   )
   
   for (i in 1:min(length(Result_all), 50)) {  # Analyze first 50 cells
-    if (!is.null(Result_all[[i]]) && is.matrix(Result_all[[i]])) {
-      net <- Result_all[[i]]
+    if (!is.null(Result_all[[i]]) && (is.matrix(Result_all[[i]]) || inherits(Result_all[[i]], "Matrix"))) {
+      net <- as.matrix(Result_all[[i]])
       n_genes <- nrow(net)
       
       # Calculate connectivity metrics
@@ -474,12 +468,12 @@ if (exists("Result_all") && !is.null(Result_all) && length(Result_all) > 0) {
     colors <- colors_func(100)
     
     for (i in 1:min(5, length(Result_all))) {
-      if (!is.null(Result_all[[i]]) && is.matrix(Result_all[[i]])) {
+      if (!is.null(Result_all[[i]]) && (is.matrix(Result_all[[i]]) || inherits(Result_all[[i]], "Matrix"))) {
         filename <- file.path(output_dir, paste0(S, suffix, "_Est_network_cell_", i, ".pdf"))
         
         # Create heatmap
         pdf(filename, width = 6, height = 5)
-        pheatmap(abs(Result_all[[i]]),  # Use absolute values for better visualization
+        pheatmap(abs(as.matrix(Result_all[[i]])),  # Use absolute values for better visualization
                  color = colors,
                  cluster_cols = FALSE, 
                  cluster_rows = FALSE,
@@ -504,7 +498,7 @@ if (exists("Result_all") && !is.null(Result_all) && length(Result_all) > 0) {
   
   tryCatch({
     # Generate random missing locations for prediction
-    set.seed(123)
+    set.seed(as.integer(Sys.getenv("STCOS_METHOD_SEED", "123")))
     miss.num <- 5
     miss.x <- runif(miss.num, min(cell.info_filtered$X), max(cell.info_filtered$X))
     miss.y <- runif(miss.num, min(cell.info_filtered$Y), max(cell.info_filtered$Y))

@@ -2,24 +2,33 @@
 % Please edit documentation in R/simulation.R
 \name{generate_batch_count}
 \alias{generate_batch_count}
-\title{Generate batch effects in counts}
+\title{Apply binomial thinning to cell-type-specific profiles}
 \usage{
-generate_batch_count(true_count, p0, celltype_proportion, seq_depth)
+generate_batch_count(
+  true_count,
+  p0,
+  celltype_proportion = NULL,
+  seq_depth = NULL
+)
 }
 \arguments{
-\item{true_count}{True count matrices}
+\item{true_count}{Named list of spot-by-gene cell-type profiles.}
 
-\item{p0}{Per-molecule binomial thinning probability. Each input count \code{n}
-is replaced by a \code{Binomial(n, 1 - p0)} draw. This operation can increase
-the observed zero proportion but is not a zero-inflated mixture model.}
+\item{p0}{Per-molecule binomial thinning probability. This operation can
+increase the observed zero proportion but is not a zero-inflated mixture
+model.}
 
-\item{celltype_proportion}{Cell type proportions}
+\item{celltype_proportion}{Unused; retained for backward compatibility.}
 
-\item{seq_depth}{Sequencing depth}
+\item{seq_depth}{Not supported here; supply the depth threshold to
+\code{\link[=generate_spot_count]{generate_spot_count()}}.}
 }
 \value{
-List of count matrices with batch effects
+Named list of thinned cell-type profiles.
 }
 \description{
-Generate batch effects in counts
+Replaces each count \eqn{Y} of every cell-type-specific profile returned by
+\code{\link[=generate_true_count]{generate_true_count()}} with \eqn{Y' \sim \mathrm{Binomial}(Y, 1 - p_0)},
+modelling capture efficiency. The sequencing-depth threshold is applied to
+the mixed spot profile by \code{\link[=generate_spot_count]{generate_spot_count()}}.
 }

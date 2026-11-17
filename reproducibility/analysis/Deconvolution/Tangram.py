@@ -1,4 +1,5 @@
 import argparse
+import os
 import numpy as np
 import pandas as pd
 from anndata import AnnData
@@ -13,6 +14,7 @@ parser = argparse.ArgumentParser(description="Run Tangram analysis with dynamic 
 parser.add_argument('S', type=str, help="The dataset identifier (e.g., S1).")
 parser.add_argument('suffix', type=str, help="The suffix for file naming (e.g., _1).")
 args = parser.parse_args()
+method_seed = int(os.environ.get("STCOS_METHOD_SEED", "0"))
 
 # Define file paths
 data_f = f'./Data/{args.S}_gene/simulated/'
@@ -66,6 +68,7 @@ ad_map = tg.map_cells_to_space(
     target_count=adata_st.obs.cell_count.sum(),
     density_prior=np.array(adata_st.obs.cell_count) / adata_st.obs.cell_count.sum(),
     num_epochs=1000,
+    random_state=method_seed,
     device='cpu'
 )
 
@@ -147,4 +150,3 @@ prob_mat.to_csv(output_f)
 # prob_mat = prob_mat.div(prob_mat.sum(axis=1), axis=0)
 # prob_mat['spot'] = [f"spot_{i}" for i in range(1, len(prob_mat) + 1)]
 # prob_mat.to_csv("./Data/S1_gene/Tangram_1.csv")
-

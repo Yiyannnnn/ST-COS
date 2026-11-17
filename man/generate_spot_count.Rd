@@ -2,22 +2,41 @@
 % Please edit documentation in R/simulation.R
 \name{generate_spot_count}
 \alias{generate_spot_count}
-\title{Generate spot-level count matrix}
+\title{Construct an abundance-weighted spot-level expression matrix}
 \usage{
-generate_spot_count(true_count, nGenes, cell_number, celltype_proportion)
+generate_spot_count(
+  true_count,
+  nGenes,
+  cell_number,
+  celltype_proportion,
+  seq_depth = NULL
+)
 }
 \arguments{
-\item{true_count}{List of true count matrices}
+\item{true_count}{Named list of spot-by-gene cell-type-specific expression
+matrices. Each row is a latent average profile for that cell type at one
+spot, not an individual-cell observation.}
 
 \item{nGenes}{Number of genes}
 
-\item{cell_number}{Number of cells per spot}
+\item{cell_number}{Total cell-equivalent abundance per spot, supplied as one
+value or one value per spot.}
 
-\item{celltype_proportion}{Cell type proportions}
+\item{celltype_proportion}{Spot-by-cell-type proportion matrix.}
+
+\item{seq_depth}{Optional depth threshold \eqn{\Delta}, one value or one
+value per spot.}
 }
 \value{
-Matrix of spot-level counts
+Abundance-weighted spot-by-gene expression matrix.
 }
 \description{
-Generate spot-level count matrix
+For spot \eqn{j}, gene \eqn{g}, and cell type \eqn{c}, constructs
+\deqn{X_{jg} = \sum_c N_j p_{jc} Y_{jg}^{(c)},}
+which propagates variation among cell-type-specific spot profiles and does
+not simulate or sum independent individual cells within a spot. When
+\code{seq_depth} is supplied, any spot whose total exceeds the depth threshold
+\eqn{\Delta} is resampled to exactly \eqn{\Delta} counts with a
+multinomial draw whose probabilities are proportional to that spot's
+profile; spots at or below \eqn{\Delta} are unchanged.
 }

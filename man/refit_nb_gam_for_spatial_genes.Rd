@@ -11,7 +11,8 @@ refit_nb_gam_for_spatial_genes(
   spatial_genes,
   mu_mat,
   theta_g,
-  spline_k = 50
+  spline_k = 50,
+  dispersion_cap = Inf
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ refit_nb_gam_for_spatial_genes(
 \item{theta_g}{Theta parameters}
 
 \item{spline_k}{Basis dimension for the thin-plate spline.}
+
+\item{dispersion_cap}{Upper bound on the refitted negative-binomial size.}
 }
 \value{
 Updated mu_mat and theta_g

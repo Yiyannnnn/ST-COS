@@ -1,4 +1,20 @@
-source("./Data/simulator_YZ.R")
+#!/usr/bin/env Rscript
+
+suppressPackageStartupMessages({
+  library(data.table)
+  library(dplyr)
+  library(egg)
+  library(ggplot2)
+})
+
+scenario_output_dir <- function(scenario) {
+  root <- Sys.getenv("STCOS_OUTPUT_ROOT", unset = "")
+  if (!nzchar(root)) {
+    return(file.path(".", "Data", paste0(scenario, "_gene"), "simulated"))
+  }
+  file.path(normalizePath(root, mustWork = FALSE),
+            paste0(scenario, "_gene"), "simulated")
+}
 
 args <- commandArgs(trailingOnly = TRUE)
 rep_id <- if (length(args) >= 1L) suppressWarnings(as.integer(args[1])) else 1L
@@ -19,9 +35,12 @@ gene_pattern = data.frame(ct1 = rep('no_pattern',150),
 
 
 
-layer_param = data.frame(ct1 = c(1/2,0,0),
-                          ct2 = c(1/4,3/4,0),
-                          ct3 = c(1/3,0,1))
+layer_weights <- data.frame(ct1 = c(1/2,0,0),
+                            ct2 = c(1/4,3/4,0),
+                            ct3 = c(1/3,0,1))
+layer_param <- as.matrix(layer_weights)
+layer_param[layer_param <= 0] <- 1e-8
+layer_param <- log(layer_param)
 
 gene_relationship = data.table(ct1 = c(rep(1,5),rep(NA,145)),
                                ct2 = c(rep(NA,5),rep(1,5),rep(NA,140)),
@@ -35,22 +54,19 @@ ymax <- c(100, 100, 100)
 
 rownames(gene_pattern) = paste0('gene',1:nGenes)
 
-coord = generate_coordinates(x_len,y_len,'hex',spot_distance=5,seed=rep_seed)
-mean_param = generate_gene_pattern(coord=coord,gene_pattern=gene_pattern,seed=rep_seed,all_lower_mean=10,all_upper_mean=50)
+coord = STCOS::generate_coordinates(x_len,y_len,'hex',spot_distance=5,seed=rep_seed)
+mean_param = STCOS::generate_gene_pattern(coord=coord,gene_pattern=gene_pattern,seed=rep_seed,all_lower_mean=10,all_upper_mean=50)
 mean_param[["ct1"]][,1:5] <- mean_param[["ct1"]][,1:5] + 70
 mean_param[["ct2"]][,6:10] <- mean_param[["ct2"]][,6:10] + 70
 mean_param[["ct3"]][,11:15] <- mean_param[["ct3"]][,11:15] + 70
-cov_gene <- generate_covariance_group(gene_relationship)
-true_count <- generate_true_count(coord,mean_param,gene_relationship = gene_relationship,cov_gene = cov_gene)
-layer_coord <- generate_layer(coord, xmin, xmax, ymin, ymax)
-celltype_proportion <- generate_cell_prop(layer_coord,layer_param)
-true_count <- generate_batch_count(
-  true_count, p0 = 0.05, celltype_proportion = celltype_proportion,
-  seq_depth = 1e6
-)
-spot_count_layers <- generate_spot_count_abundance_weighted(
+cov_gene <- STCOS::generate_covariance_group(gene_relationship)
+true_count <- STCOS::generate_true_count(coord,mean_param,gene_relationship = gene_relationship,cov_gene = cov_gene)
+layer_coord <- STCOS::generate_layer(coord, xmin, xmax, ymin, ymax)
+celltype_proportion <- STCOS::generate_cell_prop(layer_coord,layer_param)
+true_count <- STCOS::generate_batch_count(true_count, p0 = 0.05)
+spot_count_layers <- STCOS::generate_spot_count(
   true_count = true_count, nGenes = nGenes, cell_number = 10,
-  celltype_proportion = celltype_proportion
+  celltype_proportion = celltype_proportion, seq_depth = 1e6
 )
 
 rownames(coord) <- paste0("spot_",1:nrow(coord))
@@ -85,7 +101,8 @@ colnames(sc_ref)[c(2:ncol(sc_ref))] <- paste0("gene_",1:(ncol(sc_ref)-1))
 #fwrite(sc_ref,"./Data/S5_gene/simulated/S5_scref_2.csv")
 #fwrite(sc_ref,"./Data/S5_gene/simulated/S5_scref_3.csv")
 #fwrite(sc_ref,"./Data/S5_gene/simulated/S5_scref_4.csv")
-output_dir <- "./Data/S5_gene/simulated"
+output_dir <- scenario_output_dir("S5")
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 realized_prop <- celltype_proportion
 region_dt <- cbind(
   layer_coord[, .(x_coord, y_coord)],

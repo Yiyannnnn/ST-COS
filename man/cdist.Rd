@@ -2,19 +2,23 @@
 % Please edit documentation in R/utils.R
 \name{cdist}
 \alias{cdist}
-\title{Calculate pairwise distances between two sets of points}
+\title{Calculate distances from points to centers}
 \usage{
 cdist(X, Y)
 }
 \arguments{
-\item{X}{Matrix of coordinates for first set of points}
+\item{X}{Coordinates of the points.}
 
-\item{Y}{Matrix of coordinates for second set of points}
+\item{Y}{Coordinates of the centers.}
 }
 \value{
-Distance matrix between X and Y points
+Distance vector when \code{Y} has one row; otherwise a points-by-centers
+distance matrix.
 }
 \description{
-Calculate pairwise distances between two sets of points
+Computes Euclidean distances directly, without forming the full pairwise
+distance matrix, so memory grows linearly with the number of points.
+Coordinates are read from \code{x_coord}/\code{y_coord} columns when present and from
+the first two columns otherwise.
 }
 \keyword{internal}

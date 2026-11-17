@@ -1,6 +1,7 @@
 Package: STCOS
-Title: Spatial Transcriptomics Cell-type Oriented Simulator
-Version: 0.1.1
+Title: Simulator of Spatial Transcriptomic Data Preserving Gene-Gene
+    Co-Expression Patterns
+Version: 0.1.4
 Authors@R: 
     person("Yiyan", "Zhang", , "yiyan@unc.edu", role = c("aut", "cre"))
 Author: Yiyan Zhang [aut, cre]

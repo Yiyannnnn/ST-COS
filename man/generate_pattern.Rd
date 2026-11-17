@@ -38,9 +38,10 @@ generate_pattern(
 
 \item{streak_size}{Size of streaks}
 
-\item{layer}{Layer assignments}
+\item{layer}{Layer assignments, one per spot.}
 
-\item{layer_param}{Layer parameters}
+\item{layer_param}{Mean for each layer, in the order of the sorted layer
+labels.}
 
 \item{seed}{Retained for backward compatibility. \code{generate_pattern()} is
 deterministic once its pattern parameters are supplied and does not alter

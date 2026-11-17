@@ -248,33 +248,49 @@ if (!is.null(soft_power_table) && nrow(soft_power_table) > 0) {
 
 # Construct network with specified power
 cat("Constructing co-expression network...\n")
-seurat_obj <- ConstructNetwork(
-  seurat_obj,
-  soft_power = selected_power,
-  tom_name = paste0(S, suffix, "_TOM"),
-  overwrite_tom = TRUE,  # Allow overwriting existing TOM files
-  minModuleSize = 10,  # Reduce minimum module size
-  mergeCutHeight = 0.25,  # More lenient module merging
-  deepSplit = 2  # More sensitive module detection
+network_ok <- TRUE
+seurat_obj <- tryCatch(
+  ConstructNetwork(
+    seurat_obj,
+    soft_power = selected_power,
+    tom_name = paste0(S, suffix, "_TOM"),
+    overwrite_tom = TRUE,
+    minModuleSize = 10,
+    mergeCutHeight = 0.25,
+    deepSplit = 2
+  ),
+  error = function(e) {
+    cat("Network construction failed; recording no recovered modules:", conditionMessage(e), "\n")
+    network_ok <<- FALSE
+    seurat_obj
+  }
 )
 
-# Check if modules were detected
-modules <- GetModules(seurat_obj)
+# A method failure to recover a module is a valid benchmark outcome.
+modules <- if (network_ok) GetModules(seurat_obj) else data.frame(gene = character(), module = character())
 if (nrow(modules) == 0 || all(modules$module == "grey")) {
   cat("Warning: No significant modules detected. Adjusting parameters...\n")
   
   # Try with even more lenient parameters
-  seurat_obj <- ConstructNetwork(
-    seurat_obj,
-    soft_power = selected_power,
-    tom_name = paste0(S, suffix, "_TOM"),
-    overwrite_tom = TRUE,  # Allow overwriting existing TOM files
-    minModuleSize = 5,  # Very small minimum module size
-    mergeCutHeight = 0.5,  # Very lenient merging
-    deepSplit = 4  # Maximum sensitivity
-  )
-  
-  modules <- GetModules(seurat_obj)
+  if (network_ok) {
+    seurat_obj <- tryCatch(
+      ConstructNetwork(
+        seurat_obj,
+        soft_power = selected_power,
+        tom_name = paste0(S, suffix, "_TOM"),
+        overwrite_tom = TRUE,
+        minModuleSize = 5,
+        mergeCutHeight = 0.5,
+        deepSplit = 4
+      ),
+      error = function(e) {
+        cat("Lenient network construction also failed:", conditionMessage(e), "\n")
+        network_ok <<- FALSE
+        seurat_obj
+      }
+    )
+    modules <- if (network_ok) GetModules(seurat_obj) else data.frame(gene = character(), module = character())
+  }
 }
 
 # Only proceed with module-dependent analyses if modules were found

@@ -135,7 +135,7 @@ def create_shuffled_data(gene_expr, coords):
     print("Creating shuffled dataset for null hypothesis testing...")
     
     shuffled_coords = coords.copy()
-    np.random.seed(0)
+    np.random.seed(int(os.environ.get("STCOS_METHOD_SEED", "0")))
     np.random.shuffle(shuffled_coords)
     
     return shuffled_coords

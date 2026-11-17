@@ -1,9 +1,48 @@
+#' Map layout coordinates onto image pixels
+#'
+#' Scales a layout given in a y-up frame uniformly, preserving its aspect
+#' ratio, centers it on the image, and returns image-pixel coordinates with
+#' y increasing downward.
+#'
+#' @param coordinates Data frame with `x_coord` and `y_coord`.
+#' @param width,height Image size in pixels.
+#' @return Data frame of image-pixel coordinates.
+#' @keywords internal
+map_coordinates_to_image <- function(coordinates, width, height) {
+  x <- coordinates$x_coord
+  y <- coordinates$y_coord
+  span_x <- diff(range(x, finite = TRUE))
+  span_y <- diff(range(y, finite = TRUE))
+  scales <- c(if (span_x > 0) width / span_x, if (span_y > 0) height / span_y)
+  scale <- if (length(scales)) min(scales) else 0
+  coordinates$x_coord <- (x - min(x)) * scale + (width - span_x * scale) / 2
+  coordinates$y_coord <- height -
+    ((y - min(y)) * scale + (height - span_y * scale) / 2)
+  coordinates
+}
+
+#' Convert image-pixel coordinates to a y-up simulation frame
+#'
+#' @param coordinates Data frame with `x_coord` and `y_coord` in image pixels.
+#' @param height Image height in pixels.
+#' @return Data frame with `y_coord` measured upward from the image bottom.
+#' @keywords internal
+image_to_simulation_coordinates <- function(coordinates, height) {
+  coordinates$y_coord <- height - coordinates$y_coord
+  coordinates
+}
+
 #' Build the local ST-COS image-guided Shiny application
 #'
-#' Creates a local Shiny application for designing simulation coordinates from
-#' an uploaded histology image, an uploaded coordinate table, image clicks, or
-#' a generated grid, hexagonal, or random layout. Coordinates can be previewed
-#' over the image and downloaded for use in a reference-free simulation.
+#' Creates a local coordinate designer: simulation coordinates come from an
+#' uploaded coordinate table (for example, centroids from an external
+#' segmentation), image clicks, or a generated grid, hexagonal, or random
+#' layout. Generated layouts are placed on an uploaded histology image without
+#' changing their aspect ratio. With an image loaded, uploaded and clicked
+#' coordinates are read as image pixels, and the downloaded table uses a y-up
+#' frame in pixel units. Image segmentation, gene patterns, cell-type
+#' composition, and dependence settings are available in the hosted
+#' application ([launch_stcos_app()]).
 #'
 #' @return A `shiny.appobj` created by [shiny::shinyApp()].
 #' @export
@@ -49,19 +88,6 @@ stcos_shiny_app <- function() {
     )
     coordinates <- coordinates[stats::complete.cases(coordinates), , drop = FALSE]
     rownames(coordinates) <- NULL
-    coordinates
-  }
-
-  scale_to_image <- function(coordinates, image) {
-    scale_axis <- function(values, maximum) {
-      value_range <- range(values, finite = TRUE)
-      if (!all(is.finite(value_range)) || diff(value_range) == 0) {
-        return(rep(maximum / 2, length(values)))
-      }
-      (values - value_range[1]) / diff(value_range) * maximum
-    }
-    coordinates$x_coord <- scale_axis(coordinates$x_coord, image$width)
-    coordinates$y_coord <- scale_axis(coordinates$y_coord, image$height)
     coordinates
   }
 
@@ -118,7 +144,11 @@ stcos_shiny_app <- function() {
           shiny::actionButton("undo", "Undo", icon = shiny::icon("rotate-left")),
           shiny::actionButton("clear", "Clear", icon = shiny::icon("trash"))
         ),
-        shiny::downloadButton("download_coordinates", "Download coordinates")
+        shiny::downloadButton("download_coordinates", "Download coordinates"),
+        shiny::helpText(
+          "With an image loaded, uploaded and clicked coordinates are image",
+          "pixels; downloads use a y-up frame in pixel units."
+        )
       ),
       shiny::mainPanel(
         shiny::tabsetPanel(
@@ -172,7 +202,9 @@ stcos_shiny_app <- function() {
       )
       generated <- as.data.frame(generated[, c("x_coord", "y_coord")])
       image <- image_info()
-      if (!is.null(image)) generated <- scale_to_image(generated, image)
+      if (!is.null(image)) {
+        generated <- map_coordinates_to_image(generated, image$width, image$height)
+      }
       coordinates(generated)
     })
 
@@ -239,7 +271,10 @@ stcos_shiny_app <- function() {
     output$download_coordinates <- shiny::downloadHandler(
       filename = function() "stcos_image_coordinates.csv",
       content = function(file) {
-        utils::write.csv(coordinates(), file, row.names = FALSE)
+        out <- coordinates()
+        image <- image_info()
+        if (!is.null(image)) out <- image_to_simulation_coordinates(out, image$height)
+        utils::write.csv(out, file, row.names = FALSE)
       }
     )
   }

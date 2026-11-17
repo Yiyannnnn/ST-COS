@@ -2,6 +2,18 @@ library(data.table)
 library(ggplot2)
 library(stringr)
 
+local({
+  a <- commandArgs(trailingOnly = FALSE)
+  f <- sub("^--file=", "", a[grepl("^--file=", a)])
+  here <- if (length(f) == 1L) dirname(normalizePath(f)) else getwd()
+  rules <- c(Sys.getenv("STCOS_EVALUATION_RULES"),
+             file.path(here, "..", "evaluation_rules.R"),
+             file.path(getwd(), "evaluation_rules.R"))
+  rules <- rules[nzchar(rules) & file.exists(rules)]
+  if (!length(rules)) stop("Cannot find evaluation_rules.R; set STCOS_EVALUATION_RULES.")
+  source(rules[1L], local = globalenv())
+})
+
 base_dir <- "."
 default_scenarios <- paste0("S", 1:7)
 
@@ -24,157 +36,12 @@ get_reps <- function(scenario) {
   reps
 }
 
+# Truth, column alignment, and RMSE follow Supplementary Methods S2 and are
+# defined in evaluation_rules.R: named outputs are
+# matched to simulated cell types by name, unnamed STdeconvolve topics by an
+# optimal one-to-one assignment, and RMSE averages over every truth cell type.
 build_truth <- function(scenario, rep_id) {
-  sim_dir <- file.path(base_dir, "Data", paste0(scenario, "_gene"), "simulated")
-  region_file <- file.path(sim_dir, paste0(scenario, "_region_", rep_id, ".csv"))
-  layer_file <- file.path(sim_dir, paste0(scenario, "_layer_", rep_id, ".csv"))
-
-  if (file.exists(region_file)) {
-    region_dt <- fread(region_file)
-    ct_cols <- setdiff(colnames(region_dt), c("x_coord", "y_coord", "region"))
-    truth <- as.data.frame(region_dt[, ..ct_cols])
-  } else if (file.exists(layer_file)) {
-    layer_dt <- fread(layer_file)
-    if (scenario %in% c("S1", "S4")) {
-      truth <- data.frame(
-        ct1 = rep(1 / 3, nrow(layer_dt)),
-        ct2 = rep(1 / 3, nrow(layer_dt)),
-        ct3 = rep(1 / 3, nrow(layer_dt))
-      )
-    } else {
-      truth <- data.frame(
-        ct1 = ifelse(layer_dt$layer == 1, 1 / 2, ifelse(layer_dt$layer == 2, 0, 0)),
-        ct2 = ifelse(layer_dt$layer == 1, 1 / 4, ifelse(layer_dt$layer == 2, 3 / 4, 0)),
-        ct3 = ifelse(layer_dt$layer == 1, 1 / 4, ifelse(layer_dt$layer == 2, 1 / 4, 1))
-      )
-    }
-  } else {
-    stop(sprintf("No truth file found for %s rep %d.", scenario, rep_id))
-  }
-
-  rownames(truth) <- paste0("spot_", seq_len(nrow(truth)))
-  truth
-}
-
-read_pred <- function(scenario, rep_id, method) {
-  data_dir <- file.path(base_dir, "Data", paste0(scenario, "_gene"))
-  file_path <- switch(
-    method,
-    "CARD" = file.path(data_dir, paste0("CARD_", rep_id, ".csv")),
-    "RCTD" = file.path(data_dir, paste0("RCTD_", rep_id, ".csv")),
-    "Redeconve" = file.path(data_dir, paste0("Redeconve_", rep_id, ".csv")),
-    "STdeconvolve" = file.path(data_dir, paste0("STdeconvolve_", rep_id, ".csv")),
-    "STdGCN" = file.path(data_dir, paste0("STdGCN_input_", rep_id), "output", "predict_result.csv"),
-    "Tangram" = file.path(data_dir, paste0("Tangram_", rep_id, ".csv")),
-    "POLARIS" = file.path(data_dir, paste0("POLARIS_", rep_id, ".csv")),
-    stop("Unknown method: ", method)
-  )
-
-  if (!file.exists(file_path)) {
-    return(NULL)
-  }
-
-  dt <- fread(file_path)
-  spot_ids <- NULL
-
-  if ("spot" %in% names(dt)) {
-    spot_ids <- as.character(dt$spot)
-    dt[, spot := NULL]
-  }
-  if ("barcodes" %in% names(dt)) {
-    spot_ids <- as.character(dt$barcodes)
-    dt[, barcodes := NULL]
-  }
-  if ("V1" %in% names(dt) && !is.numeric(dt$V1)) {
-    spot_ids <- as.character(dt$V1)
-    dt[, V1 := NULL]
-  }
-  if ("V1" %in% names(dt) && method == "Tangram") {
-    dt[, V1 := NULL]
-  }
-
-  pred <- as.data.frame(dt)
-  pred <- pred[, sapply(pred, is.numeric), drop = FALSE]
-  if (ncol(pred) == 0) {
-    return(NULL)
-  }
-
-  if (method == "STdeconvolve" && ncol(pred) == 3) {
-    colnames(pred) <- c("ct1", "ct2", "ct3")
-  }
-
-  if (!is.null(spot_ids)) {
-    rownames(pred) <- spot_ids
-  } else {
-    rownames(pred) <- paste0("spot_", seq_len(nrow(pred)))
-  }
-  pred
-}
-
-align_truth_to_pred <- function(truth, pred_cols) {
-  # Direct overlap first
-  if (all(pred_cols %in% colnames(truth))) {
-    return(truth[, pred_cols, drop = FALSE])
-  }
-
-  # S7 truth (Cancer/Tcell/Endothelial/CAF) vs 3-component methods (ct1-ct3)
-  if (all(c("ct1", "ct2", "ct3") %in% pred_cols) &&
-      all(c("Cancer", "Tcell", "Endothelial") %in% colnames(truth))) {
-    mapped <- data.frame(
-      ct1 = truth$Cancer,
-      ct2 = truth$Tcell,
-      ct3 = truth$Endothelial,
-      row.names = rownames(truth)
-    )
-    return(mapped[, pred_cols, drop = FALSE])
-  }
-
-  # Legacy truth (ct1-ct3) vs 4-component predictions
-  if (all(c("Cancer", "Tcell", "Endothelial", "CAF") %in% pred_cols) &&
-      all(c("ct1", "ct2", "ct3") %in% colnames(truth))) {
-    mapped <- data.frame(
-      Cancer = truth$ct1,
-      Tcell = truth$ct2,
-      Endothelial = truth$ct3,
-      CAF = 0,
-      row.names = rownames(truth)
-    )
-    return(mapped[, pred_cols, drop = FALSE])
-  }
-
-  common <- intersect(pred_cols, colnames(truth))
-  if (length(common) == 0) {
-    return(NULL)
-  }
-  truth[, common, drop = FALSE]
-}
-
-calc_rmse <- function(truth, pred) {
-  if (is.null(pred) || ncol(pred) == 0) {
-    return(NA_real_)
-  }
-
-  truth_aligned <- align_truth_to_pred(truth, colnames(pred))
-  if (is.null(truth_aligned) || ncol(truth_aligned) == 0) {
-    return(NA_real_)
-  }
-
-  common_spots <- intersect(rownames(truth_aligned), rownames(pred))
-  if (length(common_spots) == 0) {
-    return(NA_real_)
-  }
-
-  truth_use <- truth_aligned[common_spots, , drop = FALSE]
-  pred_use <- pred[common_spots, colnames(truth_use), drop = FALSE]
-
-  # Handle occasional one-row mismatch in methods without spot IDs.
-  if (nrow(pred_use) != nrow(truth_use)) {
-    n <- min(nrow(pred_use), nrow(truth_use))
-    truth_use <- truth_use[seq_len(n), , drop = FALSE]
-    pred_use <- pred_use[seq_len(n), , drop = FALSE]
-  }
-
-  sqrt(mean((as.matrix(truth_use) - as.matrix(pred_use))^2, na.rm = TRUE))
+  truth_proportions(sim_dir_for(base_dir, scenario), scenario, rep_id)
 }
 
 collect_rmse <- function(scenarios) {
@@ -188,14 +55,16 @@ collect_rmse <- function(scenarios) {
     for (rep_id in reps) {
       truth <- build_truth(scenario, rep_id)
       for (method in method_order) {
-        pred <- read_pred(scenario, rep_id, method)
-        rmse <- calc_rmse(truth, pred)
+        pred <- read_deconv_prediction(base_dir, scenario, rep_id, method)
+        res <- deconv_rmse(truth, pred, method)
         rows[[idx]] <- data.table(
           scenario = scenario,
           rep = rep_id,
           method = method,
-          RMSE = rmse,
-          available = !is.null(pred)
+          RMSE = res$RMSE,
+          available = !is.null(pred),
+          n_spots = res$n_spots,
+          status = res$status
         )
         idx <- idx + 1L
       }
@@ -256,8 +125,8 @@ summary_dt <- rmse_dt[, .(
   n_total = .N,
   n_available = sum(available, na.rm = TRUE),
   n_rmse = sum(!is.na(RMSE)),
-  mean_RMSE = mean(RMSE, na.rm = TRUE),
-  median_RMSE = median(RMSE, na.rm = TRUE),
+  mean_RMSE = mean_or_na(RMSE),
+  median_RMSE = if (all(is.na(RMSE))) NA_real_ else median(RMSE, na.rm = TRUE),
   sd_RMSE = sd(RMSE, na.rm = TRUE),
   se_RMSE = sd(RMSE, na.rm = TRUE) / sqrt(sum(!is.na(RMSE)))
 ), by = .(scenario, method)]

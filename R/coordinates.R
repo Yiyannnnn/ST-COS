@@ -6,11 +6,13 @@
 #' @param pattern Pattern type: "grid", "hex", or "random"
 #' @param spot_distance Distance between spots (for grid/hex patterns)
 #' @param n_spot Number of spots (for random pattern)
-#' @param seed Random seed
+#' @param seed Optional seed passed to [set.seed()] before drawing random
+#'   coordinates. `NULL` (the default) uses the current random-number state.
+#'   Supplying a seed resets the global random-number generator.
 #' @return data.table with x and y coordinates
 #' @export
-generate_coordinates <- function(x_len, y_len, pattern, spot_distance=NULL, n_spot=NULL, seed=123) {
-  set.seed(seed)
+generate_coordinates <- function(x_len, y_len, pattern, spot_distance=NULL, n_spot=NULL, seed=NULL) {
+  if (!is.null(seed)) set.seed(seed)
   if(pattern == "grid"){
     x = seq(0, x_len, spot_distance)
     y = seq(0, y_len, spot_distance)

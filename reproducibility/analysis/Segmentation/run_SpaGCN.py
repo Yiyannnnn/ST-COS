@@ -80,7 +80,7 @@ if n_clusters < 2:
 print(f"Using {n_clusters} spatial domains from the simulation truth.")
 
 # Set seeds
-r_seed = t_seed = n_seed = 100
+r_seed = t_seed = n_seed = int(os.environ.get("STCOS_METHOD_SEED", "100"))
 
 # Search for suitable resolution
 res = spg.search_res(adata, adj, l, n_clusters, start=0.7, step=0.1, tol=5e-3, lr=0.05, max_epochs=20,

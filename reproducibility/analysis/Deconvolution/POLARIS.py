@@ -14,7 +14,8 @@ def main():
     parser.add_argument("--batch_size", type=int, default=512, help="Batch size for both ST and sc.")
     args = parser.parse_args()
 
-    root = "."
+    # POLARIS trains from its own source directory, so pass absolute paths.
+    root = os.path.abspath(".")
     sim_dir = f"{root}/Data/{args.S}_gene/simulated"
     out_csv = f"{root}/Data/{args.S}_gene/POLARIS{args.suffix}.csv"
 

@@ -1,19 +1,38 @@
-#' Calculate pairwise distances between two sets of points
-#' 
-#' @param X Matrix of coordinates for first set of points
-#' @param Y Matrix of coordinates for second set of points
-#' @return Distance matrix between X and Y points
+#' Calculate distances from points to centers
+#'
+#' Computes Euclidean distances directly, without forming the full pairwise
+#' distance matrix, so memory grows linearly with the number of points.
+#' Coordinates are read from `x_coord`/`y_coord` columns when present and from
+#' the first two columns otherwise.
+#'
+#' @param X Coordinates of the points.
+#' @param Y Coordinates of the centers.
+#' @return Distance vector when `Y` has one row; otherwise a points-by-centers
+#'   distance matrix.
 #' @keywords internal
 cdist <- function(X, Y) {
-  as.matrix(dist(rbind(X, Y)))[1:nrow(X), (nrow(X)+1):nrow(rbind(X,Y))]
+  xy <- function(Z) {
+    columns <- colnames(Z)
+    if (!is.null(columns) && all(c("x_coord", "y_coord") %in% columns)) {
+      if (is.matrix(Z)) return(cbind(as.numeric(Z[, "x_coord"]), as.numeric(Z[, "y_coord"])))
+      return(cbind(as.numeric(Z[["x_coord"]]), as.numeric(Z[["y_coord"]])))
+    }
+    Z <- as.matrix(Z)
+    cbind(as.numeric(Z[, 1L]), as.numeric(Z[, 2L]))
+  }
+  points <- xy(X)
+  centers <- xy(Y)
+  out <- vapply(seq_len(nrow(centers)), function(k) {
+    sqrt((points[, 1L] - centers[k, 1L])^2 + (points[, 2L] - centers[k, 2L])^2)
+  }, numeric(nrow(points)))
+  if (nrow(centers) == 1L) drop(out) else out
 }
 
 #' Make a correlation matrix positive definite
 #'
 #' @param rho Correlation matrix to adjust.
-#' @param epsilon Numerical eigenvalue floor used for repair. If the smallest
-#'   eigenvalue is below this value, the minimum uniform shift needed to reach
-#'   the floor is added to every eigenvalue before unit-diagonal
+#' @param epsilon Numerical eigenvalue floor used for repair. Eigenvalues below
+#'   this value are individually clipped to the floor before unit-diagonal
 #'   renormalization.
 #' @param return_diagnostics Return the repaired matrix and perturbation
 #'   diagnostics in a list.
@@ -32,8 +51,8 @@ makespd <- function(rho, epsilon = 1e-6, return_diagnostics = FALSE) {
   requested <- (rho + t(rho)) / 2
   diag(requested) <- 1
   eig <- eigen(requested, symmetric = TRUE)
-  uniform_shift <- max(0, epsilon - min(eig$values))
-  repaired_values <- eig$values + uniform_shift
+  eigenvalue_lifts <- pmax(epsilon - eig$values, 0)
+  repaired_values <- pmax(eig$values, epsilon)
   repaired <- eig$vectors %*%
     diag(repaired_values, nrow = length(repaired_values)) %*%
     t(eig$vectors)
@@ -47,15 +66,16 @@ makespd <- function(rho, epsilon = 1e-6, return_diagnostics = FALSE) {
     min_eigen_after = min(eigen(
       repaired, symmetric = TRUE, only.values = TRUE
     )$values),
-    minimum_eigenvalue_lift = uniform_shift,
-    uniform_eigenvalue_shift = uniform_shift,
+    minimum_eigenvalue_lift = max(eigenvalue_lifts),
+    total_eigenvalue_lift = sum(eigenvalue_lifts),
     n_eigenvalues_below_floor = sum(eig$values < epsilon),
-    n_eigenvalues_modified = if (uniform_shift > 0) length(eig$values) else 0L,
+    n_eigenvalues_modified = sum(eigenvalue_lifts > 0),
     relative_frobenius_perturbation =
       sqrt(sum((repaired - requested)^2)) /
       max(sqrt(sum(requested^2)), .Machine$double.eps),
     maximum_entrywise_change = max(abs(repaired - requested)),
-    epsilon = epsilon
+    epsilon = epsilon,
+    repair_method = "individual_eigenvalue_clipping"
   )
 
   if (return_diagnostics) {

@@ -11,9 +11,9 @@ ST-COS supports three workflows:
 - **Reference-based simulation:** estimate marginal, spatial, and global
   spot-level dependence parameters from an observed spatial transcriptomics
   dataset and generate new profiles from the fitted model.
-- **Image-guided design:** upload a histology image or coordinate file and
-  configure a reference-free simulation interactively in a local or hosted
-  Shiny application.
+- **Image-guided design:** place simulation coordinates on a histology image
+  with the local coordinate designer, or configure a full reference-free
+  simulation, including image segmentation, in the hosted Shiny application.
 
 <img width="966" alt="ST-COS simulation and downstream analysis workflow" src="man/figures/figure1.png" />
 
@@ -44,11 +44,15 @@ app <- stcos_shiny_app()
 shiny::runApp(app)
 ```
 
-The local designer accepts a PNG or JPEG histology image, uploaded coordinate
-tables, image-click coordinates, and generated grid, hexagonal, or random
-layouts. It overlays the coordinates on the image and exports a CSV that can
-be supplied to the reference-free workflow. The optional local interface uses
-the `shiny`, `png`, and `jpeg` packages.
+The local designer is a coordinate tool. It accepts a PNG or JPEG histology
+image, uploaded coordinate tables (for example, centroids from an external
+segmentation), image-click coordinates, and generated grid, hexagonal, or
+random layouts. Generated layouts keep their aspect ratio when placed on the
+image. With an image loaded, uploaded and clicked coordinates are read as
+image pixels, and the exported CSV uses a y-up frame in pixel units, ready for
+the reference-free workflow. The optional local interface uses the `shiny`,
+`png`, and `jpeg` packages. Image segmentation, gene patterns, cell-type
+composition, and dependence settings are provided by the hosted application.
 
 ### Open the hosted application
 
@@ -146,6 +150,41 @@ dim(spot_expression)
 spot_expression[1:4, ]
 ```
 
+## Cell-resolved data
+
+For cell-resolved or subcellular layouts, simulate each cell type at its own
+coordinates and combine the profiles without abundance mixing (equivalent to
+one cell per location):
+
+```r
+library(STCOS)
+
+set.seed(2)
+cells <- generate_coordinates(x_len = 20, y_len = 20, pattern = "random",
+                              n_spot = 300)
+cells$cell_type <- ifelse(cells$x_coord < 10, "Excitatory", "Inhibitory")
+genes <- paste0("gene_", 1:4)
+
+cell_profiles <- lapply(split(cells, cells$cell_type), function(cc) {
+  ct <- cc$cell_type[1]
+  pattern <- data.frame(c("hotspot", "hotspot", "no_pattern", "no_pattern"),
+                        row.names = genes)
+  names(pattern) <- ct
+  means <- generate_gene_pattern(cc, pattern)
+  rho <- diag(4)
+  rho[1, 2] <- rho[2, 1] <- 0.5
+  relationship <- data.frame(c(1, 1, NA, NA), row.names = genes)
+  names(relationship) <- ct
+  counts <- generate_true_count(
+    coord = cc, mean_param = means, gene_relationship = relationship,
+    cov_gene = rho, theta_g = setNames(list(rep(5, 4)), ct)
+  )[[ct]]
+  cbind(cc, counts)
+})
+cell_expression <- do.call(rbind, cell_profiles)
+head(cell_expression)
+```
+
 ## Reference-based simulation
 
 For an observed count matrix with genes in rows and spots in columns, estimate
@@ -166,7 +205,8 @@ simulated <- generate_true_count(
   mean_param = fitted$mean_param,
   gene_relationship = fitted$gene_relationship,
   cov_gene = fitted$cov_gene,
-  theta_g = fitted$theta_g
+  theta_g = fitted$theta_g,
+  library_size = fitted$library_size
 )
 ```
 
@@ -199,22 +239,42 @@ specified through the reference-free workflow.
   factorial stress tests, but it is not asserted to be a biological model of
   tissue organization; users can couple them through shared regions,
   covariates, annotations, or image masks.
+- `generate_cell_prop()` treats `layer_param` as layer-by-cell-type mean
+  logits, draws one Gaussian-perturbed logit per layer and cell type
+  (`noise_sd = 1e-4` by default), and converts them to proportions with a
+  softmax.
 - `generate_gene_pattern()` returns one spot-by-gene mean matrix per cell type.
   Scalar foreground or background inputs are broadcast by request, whereas
   omitted levels are sampled separately for each gene-cell-type combination.
 - `generate_batch_count()` applies per-molecule binomial thinning. It may
   increase the observed zero proportion but does not fit or simulate a
   zero-inflated mixture distribution.
+- `generate_batch_count()` thins each cell-type profile binomially;
+  `generate_spot_count(seq_depth = )` resamples any mixed spot whose total
+  exceeds the depth threshold to exactly that total (multinomial).
+- `generate_covariance_group()` builds blocks with a matrix exponential; the
+  implied latent correlations are close to one. Supply your own correlation
+  matrices, as in the quick start, to set specific values.
+- `generate_coordinates()` and `generate_gene_pattern()` reset the global
+  random-number generator only when `seed` is supplied; otherwise call
+  `set.seed()` once before a simulation.
+- `get_real_param()` refits genes with significant positive spatial
+  autocorrelation (one-sided Moran's I tests, BH-adjusted P <= 0.05), caps
+  every negative-binomial size at `dispersion_cap = 1e6`, and returns
+  library-normalized means with the observed library sizes; pass
+  `library_size` to `generate_true_count()` to apply them.
 - `eigen_floor = 1e-6` is the default numerical floor used when repairing a
-  latent correlation matrix before Cholesky factorization. When the minimum
-  eigenvalue is below the floor, ST-COS adds the minimum uniform shift needed
-  to bring it to the floor, then renormalizes the matrix to unit diagonal.
+  latent correlation matrix before Cholesky factorization. Eigenvalues below
+  the floor are individually clipped to the floor before the matrix is
+  reconstructed and renormalized to unit diagonal.
+- Reference-based estimation uses a randomized discrete PIT on the interval
+  `[F(y - 1), F(y)]`; for a zero count, the lower endpoint is `F(-1) = 0`.
 
 ## Documentation and support
 
 - [Full tutorial](https://yiyannnnn.github.io/STCOS_tutorial/)
 - [Tutorial source](https://github.com/Yiyannnnn/STCOS_tutorial)
-- [Manuscript reproducibility code](reproducibility/README.md)
+- [Main-figure reproducibility code](reproducibility/README.md) (Figures 2-4)
 - [Report a problem or request a feature](https://github.com/Yiyannnnn/ST-COS/issues)
 - In R, run `help(package = "STCOS")` or `?generate_true_count` for function
   documentation.

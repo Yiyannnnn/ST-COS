@@ -2,24 +2,22 @@
 % Please edit documentation in R/layers.R
 \name{generate_layer}
 \alias{generate_layer}
-\title{Generate layer coordinates}
+\title{Assign spots to rectangular layers}
 \usage{
 generate_layer(coord, xmin, xmax, ymin, ymax)
 }
 \arguments{
-\item{coord}{Base coordinates}
+\item{coord}{Coordinates with \code{x_coord} and \code{y_coord}.}
 
-\item{xmin}{Vector of minimum x values}
-
-\item{xmax}{Vector of maximum x values}
-
-\item{ymin}{Vector of minimum y values}
-
-\item{ymax}{Vector of maximum y values}
+\item{xmin, xmax, ymin, ymax}{Rectangle bounds, one value per layer.}
 }
 \value{
-Data frame with layer assignments
+\code{coord} with an integer \code{layer} column, in the original row order.
 }
 \description{
-Generate layer coordinates
+Spot \eqn{j} belongs to layer \eqn{i} when
+\eqn{x_{\min,i} < x_j \le x_{\max,i}} and
+\eqn{y_{\min,i} < y_j \le y_{\max,i}} (with a tolerance of
+\eqn{10^{-5}}). When rectangles overlap, the first listed layer wins.
+Every spot must fall inside at least one rectangle.
 }

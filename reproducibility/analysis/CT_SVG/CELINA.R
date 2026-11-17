@@ -1,200 +1,228 @@
-library(CARD)
-library(MuSiC)
-library(CELINA)
-library(data.table)
-library(tidyverse)
+#!/usr/bin/env Rscript
+
+suppressPackageStartupMessages({
+  library(CELINA)
+  library(data.table)
+})
 
 args <- commandArgs(trailingOnly = TRUE)
-
-# Ensure the correct number of arguments are provided
-if (length(args) != 2) {
-  stop("Please provide the two arguments: S and suffix (_N).")
+if (length(args) < 2L || length(args) > 3L) {
+  stop("Usage: CELINA.R SCENARIO SUFFIX [both|estimated|trueprop]")
 }
 
+dataset_id <- args[1L]
+suffix <- args[2L]
+mode <- if (length(args) == 3L) tolower(args[3L]) else "both"
+if (!mode %in% c("both", "estimated", "trueprop")) {
+  stop("Mode must be one of: both, estimated, trueprop.")
+}
 
-S <- args[1]
-suffix <- args[2]
+base_dir <- file.path(".", "Data", paste0(dataset_id, "_gene"))
+sim_dir <- file.path(base_dir, "simulated")
+sc_ref_file <- file.path(sim_dir, paste0(dataset_id, "_scref", suffix, ".csv"))
+expression_file <- file.path(sim_dir, paste0(dataset_id, "_gene_expression", suffix, ".csv"))
+coord_file <- file.path(sim_dir, paste0(dataset_id, "_coord", suffix, ".csv"))
+region_file <- file.path(sim_dir, paste0(dataset_id, "_region", suffix, ".csv"))
+layer_file <- file.path(sim_dir, paste0(dataset_id, "_layer", suffix, ".csv"))
 
-# Construct file paths based on the arguments
-sc_ref_file <- paste0("./Data/", S, "_gene/simulated/", S, "_scref", suffix, ".csv")
-gene_expression_file <- paste0("./Data/", S, "_gene/simulated/",S, "_gene_expression", suffix, ".csv")
-coord_file <- paste0("./Data/", S, "_gene/simulated/", S, "_coord", suffix, ".csv")
-layer_file <- paste0("./Data/", S, "_gene/simulated/", S, "_layer", suffix, ".csv")
+required_inputs <- c(sc_ref_file, expression_file, coord_file)
+missing_inputs <- required_inputs[!file.exists(required_inputs)]
+if (length(missing_inputs) > 0L) {
+  stop("Missing required input(s): ", paste(missing_inputs, collapse = ", "))
+}
 
-if (S %in% c("S1","S4")){
-      truth <- data.frame(ct1 = rep(1/3,492),ct2 = rep(1/3,492),ct3 = rep(1/3,492))
-    }else{
-    truth_layer <- fread(layer_file)
-    truth <- truth_layer |> mutate(
-      ct1 = case_when(layer == 1 ~ 1/2, layer == 2 ~ 1/4, layer == 3 ~ 0),
-      ct2 = case_when(layer == 1 ~ 1/4, layer == 2 ~ 3/4, layer == 3 ~ 0),
-      ct3 = case_when(layer == 1 ~ 1/4, layer == 2 ~ 0, layer == 3 ~ 1)
-    ) |> select(ct1, ct2, ct3)
+build_truth <- function(spot_ids) {
+  if (file.exists(region_file)) {
+    region_dt <- fread(region_file)
+    ct_cols <- setdiff(names(region_dt), c("x_coord", "y_coord", "region"))
+    if (length(ct_cols) > 0L) {
+      truth <- as.data.frame(region_dt[, ..ct_cols])
+      if (nrow(truth) != length(spot_ids)) {
+        stop("Region-derived truth row count does not match spot count.")
+      }
+      rownames(truth) <- spot_ids
+      return(truth)
+    }
   }
 
+  if (!file.exists(layer_file)) {
+    stop("Neither region nor layer input is available for truth proportions.")
+  }
+  layer_dt <- fread(layer_file)
+  if (!"layer" %in% names(layer_dt)) {
+    stop("Layer input must contain a 'layer' column.")
+  }
+  if (nrow(layer_dt) != length(spot_ids)) {
+    stop("Layer-derived truth row count does not match spot count.")
+  }
 
-  # Add perturbation to rows with consistent values (all equal to 1/3)
-  # This keeps the row sum constant (still equals 1 for each row)
-  set.seed(123) # For reproducibility
-  perturbation <- matrix(rnorm(nrow(truth) * ncol(truth), mean = 0, sd = 0.1), 
-              nrow = nrow(truth))
-  truth <- truth + perturbation
-  # Ensure all values are non-negative
-  truth[truth < 0] <- 0
-  # Re-normalize rows to sum to 1
-  truth <- truth / rowSums(truth)
-
-
-
-sc_ref <- read.csv(sc_ref_file) # load in counts matrix
-sc_meta_in = data.frame("cellType" = sc_ref$Cell_type)
-sc_ref <- t(sc_ref[,-1])
-colnames(sc_ref) <- 1:ncol(sc_ref) # rename columns to 1:ncol(sc_ref)
-
-
-rownames(sc_meta_in) = colnames(sc_ref)
-sc_meta_in$cellID = rownames(sc_meta_in)
-sc_meta_in$sampleInfo=1
-location= read.csv(coord_file) # load in coordinates
-colnames(location) = c("x","y")
-sc_meta_in_subset = sc_meta_in
-
-spatial_count = read.csv(gene_expression_file) # load in counts matrix
-spatial_count = abs(round(t(spatial_count)))
-spatial_count = spatial_count/100
-
-# Keep only genes shared by scRNA reference and spatial counts.
-common_genes <- intersect(rownames(sc_ref), rownames(spatial_count))
-if (length(common_genes) == 0) {
-  stop("No overlapping genes between scRNA reference and spatial counts.")
+  if (dataset_id %in% c("S1", "S4")) {
+    truth <- data.frame(
+      ct1 = rep(1 / 3, nrow(layer_dt)),
+      ct2 = rep(1 / 3, nrow(layer_dt)),
+      ct3 = rep(1 / 3, nrow(layer_dt))
+    )
+  } else {
+    # Row-normalized S2/S3/S5/S6 generator weights:
+    # ct1 = (1/2, 0, 0), ct2 = (1/4, 3/4, 0), ct3 = (1/3, 0, 1).
+    truth <- data.frame(
+      ct1 = ifelse(layer_dt$layer == 1, 6 / 13, 0),
+      ct2 = ifelse(layer_dt$layer == 1, 3 / 13, ifelse(layer_dt$layer == 2, 1, 0)),
+      ct3 = ifelse(layer_dt$layer == 1, 4 / 13, ifelse(layer_dt$layer == 3, 1, 0))
+    )
+  }
+  rownames(truth) <- spot_ids
+  truth
 }
-sc_ref <- sc_ref[common_genes, , drop = FALSE]
-spatial_count <- spatial_count[common_genes, , drop = FALSE]
-scRNA_count_subset <- sc_ref
 
-rownames(location) = 1:nrow(location)
-colnames(spatial_count) = 1:ncol(spatial_count) # rename columns to 1:ncol(spatial_count)
+# CELINA reports unadjusted ACAT-combined P values; genes are called at
+# BH-adjusted FDR 0.05 within each cell type (Supplementary Methods S2).
+extract_significant_genes <- function(obj, cell_types) {
+  result <- setNames(vector("list", length(cell_types)), cell_types)
+  for (cell_type in intersect(names(obj@result), cell_types)) {
+    table <- obj@result[[cell_type]]
+    if (is.data.frame(table) && "CombinedPvals" %in% names(table)) {
+      adjusted <- stats::p.adjust(table$CombinedPvals, method = "BH")
+      keep <- !is.na(adjusted) & adjusted <= 0.05
+      result[[cell_type]] <- rownames(table)[keep]
+    }
+  }
+  result
+}
 
-CARD_obj = createCARDObject(
-    sc_count = scRNA_count_subset,
-    sc_meta = sc_meta_in_subset,
-    spatial_count = spatial_count,
+run_celina <- function(proportions, project, output_file) {
+  proportions <- as.data.frame(proportions)
+  if (nrow(proportions) != ncol(spatial_counts)) {
+    stop(project, " proportion row count does not match the spot count.")
+  }
+  rownames(proportions) <- spot_ids
+  cell_types <- names(proportions)
+  cell_types <- cell_types[!is.na(cell_types) & nzchar(cell_types)]
+  if (length(cell_types) == 0L) {
+    stop("No valid cell types were available for ", project, ".")
+  }
+
+  obj <- Create_Celina_Object(
+    celltype_mat = t(as.matrix(proportions[, cell_types, drop = FALSE])),
+    gene_expression_mat = spatial_counts,
+    location = as.matrix(location),
+    covariates = NULL,
+    project = project
+  )
+  obj <- preprocess_input(
+    obj,
+    cell_types_to_test = cell_types,
+    scRNA_count = sc_counts,
+    sc_cell_type_labels = sc_meta$cellType,
+    threshold = 0
+  )
+  obj <- Calculate_Kernel(obj, approximation = FALSE)
+  obj <- tryCatch(
+    Testing_interaction_all(obj, num_cores = 1),
+    error = function(error) {
+      message(project, " failed: ", conditionMessage(error))
+      NULL
+    }
+  )
+  if (is.null(obj) || length(obj@result) == 0L) {
+    message(project, " produced no test results; no output was written.")
+    return(FALSE)
+  }
+
+  saveRDS(obj@result, sub("\\.RDS$", "_pvalues.RDS", output_file))
+  significant_genes <- extract_significant_genes(obj, cell_types)
+  saveRDS(significant_genes, output_file)
+  for (cell_type in names(significant_genes)) {
+    cat(project, cell_type, ":", length(significant_genes[[cell_type]]),
+        "significant genes\n")
+  }
+  cat("Saved:", output_file, "\n")
+  TRUE
+}
+
+sc_ref_dt <- fread(sc_ref_file)
+if (!"Cell_type" %in% names(sc_ref_dt)) {
+  stop("Single-cell reference input must contain a 'Cell_type' column.")
+}
+spatial_dt <- fread(expression_file)
+coord_dt <- fread(coord_file)
+if (!all(c("x_coord", "y_coord") %in% names(coord_dt))) {
+  stop("Coordinate input must contain x_coord and y_coord columns.")
+}
+
+spot_ids <- paste0("spot_", seq_len(nrow(coord_dt)))
+location <- as.data.frame(coord_dt[, .(x_coord, y_coord)])
+names(location) <- c("x", "y")
+rownames(location) <- spot_ids
+
+common_genes <- intersect(
+  setdiff(names(sc_ref_dt), "Cell_type"),
+  names(spatial_dt)
+)
+if (length(common_genes) == 0L) {
+  stop("No overlapping genes between the reference and spatial inputs.")
+}
+
+sc_meta <- data.frame(
+  cellType = sc_ref_dt$Cell_type,
+  cellID = paste0("cell_", seq_len(nrow(sc_ref_dt))),
+  sampleInfo = 1,
+  stringsAsFactors = FALSE
+)
+rownames(sc_meta) <- sc_meta$cellID
+sc_counts <- t(as.matrix(sc_ref_dt[, ..common_genes]))
+colnames(sc_counts) <- sc_meta$cellID
+rownames(sc_counts) <- common_genes
+
+spatial_counts <- t(abs(round(as.matrix(spatial_dt[, ..common_genes])))) / 100
+rownames(spatial_counts) <- common_genes
+colnames(spatial_counts) <- spot_ids
+truth_prop <- build_truth(spot_ids)
+
+failed <- character(0)
+
+if (mode %in% c("both", "trueprop")) {
+  ok <- run_celina(
+    proportions = truth_prop,
+    project = paste0(dataset_id, "_trueprop"),
+    output_file = file.path(base_dir, paste0("CELINA_trueprop", suffix, ".RDS"))
+  )
+  if (!ok) failed <- c(failed, "CELINA_trueprop")
+}
+
+if (mode %in% c("both", "estimated")) {
+  card_obj <- CARD::createCARDObject(
+    sc_count = sc_counts,
+    sc_meta = sc_meta,
+    spatial_count = spatial_counts,
     spatial_location = location,
     ct.varname = "cellType",
-    ct.select = unique(sc_meta_in$cellType),
+    ct.select = unique(sc_meta$cellType),
     sample.varname = "sampleInfo",
     minCountGene = 0,
-    minCountSpot = 0) 
-
-card_ok <- TRUE
-CARD_obj <- tryCatch(
-  CARD_deconvolution(CARD_object = CARD_obj),
-  error = function(e) {
-    message("CARD_deconvolution failed: ", e$message)
-    NULL
-  }
-)
-
-if (is.null(CARD_obj)) {
-  card_ok <- FALSE
-}
-
-# Match results with spatial locations, save results to data_section.
-if (card_ok) {
-  celltype_proportion <- CARD_obj@Proportion_CARD
-} else {
-  message("Falling back to truth proportions for CELINA input.")
-  celltype_proportion <- as.data.frame(truth)
-  colnames(celltype_proportion) <- colnames(truth)
-  rownames(celltype_proportion) <- rownames(location)
-}
-cell_types_to_test <- colnames(celltype_proportion)
-if (is.null(cell_types_to_test) || length(cell_types_to_test) == 0) {
-  stop("No cell-type columns found in CARD deconvolution output.")
-}
-cell_types_to_test <- cell_types_to_test[!is.na(cell_types_to_test) & nzchar(cell_types_to_test)]
-cat("Testing cell types:", paste(cell_types_to_test, collapse = ", "), "\n")
-
-
-Obj = Create_Celina_Object(celltype_mat = t(celltype_proportion), 
-                              gene_expression_mat = as.matrix(spatial_count), 
-                              location = as.matrix(location),
-                              covariates = NULL,
-                              project = "Simulator")
-
-Obj = preprocess_input(Obj, 
-                       # Celina object
-                       cell_types_to_test = cell_types_to_test, 
-                       # a vector of cell types to be used for testing 
-                       scRNA_count = as.matrix(scRNA_count_subset), 
-                       # a gene x cell expression matrix of reference scRNA-seq data
-                       sc_cell_type_labels = sc_meta_in$cellType, 
-                       # a vector of cell type labels for each cell in scRNA_count
-                       threshold = 0)
-
-Obj = Calculate_Kernel(Obj, approximation = F)
-Obj <- tryCatch(
-  Testing_interaction_all(Obj, num_cores = 1),
-  error = function(e) {
-    message("Testing_interaction_all failed: ", e$message)
-    NULL
-  }
-)
-
-# Filter results where CombinedPvals <= 0.05 and create a list of significant genes
-significant_genes <- setNames(vector("list", length(cell_types_to_test)), cell_types_to_test)
-
-if (!is.null(Obj) && length(Obj@result) > 0) {
-  for (ct in names(Obj@result)) {
-    sig_rows <- Obj@result[[ct]][Obj@result[[ct]]$CombinedPvals <= 0.05, ]
-    significant_genes[[ct]] <- rownames(sig_rows)
+    minCountSpot = 0
+  )
+  card_obj <- tryCatch(
+    CARD::CARD_deconvolution(CARD_object = card_obj),
+    error = function(error) {
+      message("CARD deconvolution failed: ", conditionMessage(error))
+      NULL
+    }
+  )
+  # Default CELINA requires estimated proportions. If CARD fails, the run is
+  # recorded as failed rather than substituting (perturbed) true proportions.
+  if (is.null(card_obj)) {
+    failed <- c(failed, "CELINA (CARD deconvolution failed)")
+  } else {
+    ok <- run_celina(
+      proportions = as.data.frame(card_obj@Proportion_CARD),
+      project = paste0(dataset_id, "_estimated"),
+      output_file = file.path(base_dir, paste0("CELINA", suffix, ".RDS"))
+    )
+    if (!ok) failed <- c(failed, "CELINA")
   }
 }
 
-# Save the list of significant genes as RDS file
-saveRDS(significant_genes, paste0("./Data/", S, "_gene/CELINA", suffix, ".RDS"))
-
-# Print summary of significant genes found
-for (ct in names(significant_genes)) {
-  cat(ct, ":", length(significant_genes[[ct]]), "significant genes\n")
+if (length(failed) > 0L) {
+  stop("CELINA runs failed for ", dataset_id, suffix, ": ", paste(failed, collapse = "; "))
 }
-
-# # Truth
-# Obj = Create_Celina_Object(celltype_mat = as.matrix(celltype_proportion), 
-#                               gene_expression_mat = as.matrix(spatial_count), 
-#                               location = as.matrix(location),
-#                               covariates = NULL,
-#                               project = "Simulator_truth")
-
-# Obj = preprocess_input(Obj, 
-#                        # Celina object
-#                        cell_types_to_test = c('ct1', 'ct2','ct3'), 
-#                        # a vector of cell types to be used for testing 
-#                        scRNA_count = as.matrix(scRNA_count_subset), 
-#                        # a gene x cell expression matrix of reference scRNA-seq data
-#                        sc_cell_type_labels = sc_meta_in$cellType, 
-#                        # a vector of cell type labels for each cell in scRNA_count
-#                        threshold = 0)
-
-# Obj = Calculate_Kernel(Obj, approximation = F)
-# Obj = Testing_interaction_all(Obj,num_cores=20)
-
-# # Filter results where CombinedPvals <= 0.05 and create a list of significant genes
-# significant_genes <- list()
-
-# # Loop through each cell type in the results
-# for (ct in names(Obj@result)) {
-#   # Filter rows where CombinedPvals <= 0.05
-#   sig_rows <- Obj@result[[ct]][Obj@result[[ct]]$CombinedPvals <= 0.05, ]
-  
-#   # Extract rownames of significant genes
-#   significant_genes[[ct]] <- rownames(sig_rows)
-# }
-
-# # Save the list of significant genes as RDS file
-# saveRDS(significant_genes, paste0("./Data/",S,"_gene/CELINA_trueprop", suffix, ".RDS"))
-
-# # Print summary of significant genes found
-# for (ct in names(significant_genes)) {
-#   cat(ct, ":", length(significant_genes[[ct]]), "significant genes\n")
-# }

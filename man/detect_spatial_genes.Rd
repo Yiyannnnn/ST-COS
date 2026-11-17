@@ -4,7 +4,7 @@
 \alias{detect_spatial_genes}
 \title{Detect spatial genes}
 \usage{
-detect_spatial_genes(expr, W, gene_names, moran_thr = 0.15)
+detect_spatial_genes(expr, W, gene_names, alpha = 0.05, moran_thr = NULL)
 }
 \arguments{
 \item{expr}{Expression matrix}
@@ -13,12 +13,15 @@ detect_spatial_genes(expr, W, gene_names, moran_thr = 0.15)
 
 \item{gene_names}{Gene names}
 
-\item{moran_thr}{Threshold for Moran's I}
+\item{alpha}{Significance level for the BH-adjusted P values.}
+
+\item{moran_thr}{Optional additional minimum Moran's I; \code{NULL} applies none.}
 }
 \value{
 Vector of spatial gene names
 }
 \description{
-Detect spatial genes
+Selects genes with significant positive spatial autocorrelation: one-sided
+Moran's I tests with Benjamini-Hochberg adjustment across genes.
 }
 \keyword{internal}

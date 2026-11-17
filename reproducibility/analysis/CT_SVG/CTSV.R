@@ -104,10 +104,12 @@ build_truth <- function() {
       ct3 = rep(1 / 3, nrow(layer_dt))
     )
   } else {
+    # Row-normalized S2/S3/S5/S6 generator weights:
+    # ct1 = (1/2, 0, 0), ct2 = (1/4, 3/4, 0), ct3 = (1/3, 0, 1).
     truth_df <- data.frame(
-      ct1 = ifelse(layer_dt$layer == 1, 1 / 2, ifelse(layer_dt$layer == 2, 1 / 4, 0)),
-      ct2 = ifelse(layer_dt$layer == 1, 1 / 4, ifelse(layer_dt$layer == 2, 3 / 4, 0)),
-      ct3 = ifelse(layer_dt$layer == 1, 1 / 4, ifelse(layer_dt$layer == 2, 0, 1))
+      ct1 = ifelse(layer_dt$layer == 1, 6 / 13, 0),
+      ct2 = ifelse(layer_dt$layer == 1, 3 / 13, ifelse(layer_dt$layer == 2, 1, 0)),
+      ct3 = ifelse(layer_dt$layer == 1, 4 / 13, ifelse(layer_dt$layer == 3, 1, 0))
     )
   }
   truth_mat <- as.matrix(truth_df)

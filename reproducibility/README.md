@@ -1,158 +1,94 @@
-# ST-COS reproducibility code
+# ST-COS reproducibility
 
-This directory contains the manuscript analysis and figure-generation code,
-the audited historical simulation helper, and the maintained package workflow.
-These sources are kept separate so that the reported manuscript results are
-not conflated with corrections made to the public package after review. See
-[`ANALYSIS_PROVENANCE.md`](ANALYSIS_PROVENANCE.md) for the audit of the
-historical code and outputs.
+This directory contains the minimal code and environment records needed to
+regenerate S1-S7, rerun the included downstream methods, and run the four
+reference-based simulators used in the comparison. Scenario scripts call the
+exported `STCOS` package functions directly; they do not replace package
+functions with a second simulator implementation.
 
-## Start here
+## Layout
 
-From the package root:
+| Path | Contents |
+| --- | --- |
+| `analysis/Data/` | S1-S7 generators for Figures 2-3; one seeded replicate per call |
+| `analysis/{Deconvolution,Segmentation,SVG_detection,CT_SVG,coexpression}/` | Downstream method runners and task-level evaluation scripts |
+| `analysis/Reference_based/` | Standalone ST-COS, SRTsim, scDesign3, and scCube reference-based runners |
+| `analysis/evaluation_rules.R` | Shared truth and metric definitions |
+| `downstream_check/` | Slurm launchers for every included downstream method and S1-S7 replicate |
+| `environment/` | R lock files, pinned Python requirements, external-repository patches, and restoration scripts |
+| `data_external/` | Local location for prepared public reference datasets; data are not redistributed |
+| `METHOD_SEEDS.tsv` | Method-specific base seeds |
+| `RUNNER_DEPENDENCIES.tsv` | Direct package versions and external source commits used by each runner |
+| `SOFTWARE_VERSIONS.tsv` | Complete software inventory for the recorded environments |
+| `EXTERNAL_INPUTS.txt` | Public dataset identifiers, URLs, expected filenames, and input schemas |
+
+## Restore the package environment
+
+From the package root, use R 4.4.0:
+
+```r
+install.packages("renv")
+renv::restore(lockfile = "reproducibility/environment/renv.lock")
+```
+
+Then install the included package source:
 
 ```bash
-export R_LIBS_USER="${HOME}/Rlibs"
 R CMD INSTALL .
-cd reproducibility
-Rscript validate_core.R
-Rscript audit_legacy_s2.R
-Rscript check_environment.R
 ```
 
-`validate_core.R` directly checks the issues raised during review: seed
-propagation across genes, positive-definite repair by the declared uniform
-eigenvalue shift, the Cholesky orientation, and binomial thinning. It writes its
-results to `results/core_validation/`.
+The SpaceX and Python environments are separate. Their exact restoration
+commands are in `environment/README.md`.
 
-`audit_legacy_s2.R` uses the helper preserved under `historical/` to reconstruct
-the recoverable historical S2 path with seed 123, 5% binomial thinning, and
-abundance weighting, then verifies the archived SHA-256 hash. This audit is
-separate from the maintained package implementation.
+## Generate S1-S7
 
-`MANIFEST.tsv` maps each manuscript result to its generating and plotting
-scripts. `SEEDS.tsv` records the scenario seeds, and `SOFTWARE.tsv` records the
-validated software environment. The complete analysis code is under
-`analysis/`.
-
-## External data
-
-Public reference datasets are not duplicated in this repository. Place them
-under `data_external/` using the layout in
-[`data_external/README.md`](data_external/README.md). The simulated scenario
-scripts do not require these data.
-
-## Main workflows
-
-### Simulated scenarios S1-S7
-
-The scenario scripts are supplied to expose the complete simulation and
-downstream workflow. From `reproducibility/`, users can generate a new set of
-five seeded replicates with:
+Each scenario script accepts a replicate number from 1 to 5. The script derives
+and records its simulation seed from the scenario and replicate number.
 
 ```bash
-bash run_scenarios.sh
+export STCOS_OUTPUT_ROOT=/path/to/generated_scenarios
+Rscript reproducibility/analysis/Data/S1_gene/simulated/S1_gene_simulate.R 1
 ```
 
-Each generator can also be run separately from `reproducibility/analysis`
-with a replicate number from 1 to 5. For example:
+Use the analogous script under `S2_gene` through `S7_gene` for the remaining
+scenarios and repeat with replicate numbers 1-5.
+
+## Run downstream methods
+
+On a Slurm system, submit all included methods after generating S1-S7:
 
 ```bash
-Rscript Data/S1_gene/simulated/S1_gene_simulate.R 1
-Rscript Data/S7_gene/simulated/S7_gene_STCOS_simulation.R 1
+bash reproducibility/downstream_check/submit_all_methods.sh \
+  /path/to/generated_scenarios /path/to/downstream_checks
 ```
 
-The corresponding seeds are listed in `../SEEDS.tsv`. Downstream method
-scripts are grouped by task in `Deconvolution/`, `Segmentation/`,
-`SVG_detection/`, `CT_SVG/`, and `coexpression/`. Summary plotting scripts
-write both per-replicate tables and publication figures.
+`METHOD_SEEDS.tsv` defines the base seed for each method. The launcher combines
+that base seed with the scenario and replicate indices, and records the value in
+each job log. `RUNNER_DEPENDENCIES.tsv` maps every method to its runner and
+software source.
 
-### DLPFC reference-based analysis
+## Run reference-based simulations
 
-For each of the 12 sections listed in `../SEEDS.tsv`:
+The shared prepared-input format is a gene-by-observation count CSV whose first
+column contains gene identifiers, plus a coordinate CSV whose first column
+contains matching observation identifiers and whose numeric columns are named
+`row` and `col`. Run, for example:
 
 ```bash
-Rscript Reference_based/DLPFC_run_methods_by_slide.R 151673 all
-python3 Reference_based/DLPFC_scCube_generate.py 151673
-Rscript Reference_based/DLPFC_metrics_by_slide.R 151673
-Rscript Reference_based/DLPFC_gene_corr_by_slide.R 151673
+Rscript reproducibility/analysis/Reference_based/stcos.R \
+  counts.csv coords.csv output/stcos 20260922
 ```
 
-After all sections finish:
+The corresponding runners are `srtsim.R`, `scdesign3.R`, and `sccube.py`.
+scCube additionally requires a pretrained model and its ordered training-gene
+list. `EXTERNAL_INPUTS.txt` declares the public DLPFC Visium, hypothalamus
+MERFISH, and olfactory-bulb Stereo-seq resources, expected filenames, and
+dataset-specific prepared formats.
 
-```bash
-Rscript Reference_based/DLPFC_plot_4summary.R
-Rscript Reference_based/DLPFC_figure4_statistics.R
-Rscript Reference_based/DLPFC_strong_pair_recovery.R
-```
+## Scope
 
-### MERFISH cross-platform analysis
-
-For each field `04`, `09`, `14`, `19`, and `24`:
-
-```bash
-Rscript Reference_based/merfish_run_methods_by_slide.R 04
-```
-
-Then run the MERFISH comparison scripts listed in `MANIFEST.tsv`.
-
-### Revision experiments
-
-```bash
-# Latent versus realized count-scale correlation
-Rscript Independent_simulator_anchor/simulate_count_correlation_attenuation.R
-
-# Ectopic white-matter SVG counterfactual
-Rscript Independent_simulator_anchor/DLPFC_ectopic_WM_SVG_demo.R
-
-# Parameter sensitivity for one section
-Rscript Reference_based/DLPFC_parameter_sensitivity.R all 151673
-
-# Combine the multi-section sensitivity results
-Rscript Reference_based/combine_DLPFC_multislide_sensitivity.R
-```
-
-## Compute-intensive methods
-
-Several downstream packages require separate environments or scheduler jobs.
-The exact launch scripts are included, notably
-`Independent_simulator_anchor/submit_S7SRT_heavy_downstream.sh`,
-`Reference_based/submit_DLPFC_jobs.sh`, and the method-specific files in each
-task directory. Run these only after `check_environment.R` reports the needed
-packages and external programs.
-
-## Model and code provenance
-
-The package API in the repository root is the authoritative maintained
-implementation for new simulations.
-In particular:
-
-- `generate_gene_pattern()` sets the seed once per call; deterministic helper
-  functions do not reset it inside the gene loop.
-- `makespd()` applies the minimum uniform shift needed to raise the smallest
-  eigenvalue to `epsilon`, then renormalizes the repaired matrix to unit
-  diagonal.
-- `generate_batch_count()` performs binomial thinning, not zero-inflated
-  mixture sampling.
-- `generate_spot_count()` implements the abundance-weighted spot-level model
-  described in the revised manuscript.
-
-The S1-S7 generators under `analysis/Data/` retain the abundance-weighted
-spot-level formulation described in the revised manuscript. Their seeds in
-`SEEDS.tsv` are provided for deterministic new runs and are not presented as
-recovered seeds for every historical output. The manuscript analyses remain
-linked to their archived inputs and the historical helper documented in
-`ANALYSIS_PROVENANCE.md`; correcting the maintained package does not replace or
-silently regenerate those reported results.
-
-## Reproducibility record
-
-From `reproducibility/`, run:
-
-```bash
-Rscript check_environment.R
-```
-
-This writes R and package versions to `results/session/`. Record the Git commit
-alongside archived result files. Do not commit raw controlled data, package
-caches, or third-party model weights.
+The repository supplies executable generation, method, and task-evaluation
+code. Large public reference datasets, pretrained models, and generated result
+directories are inputs or outputs and are not redistributed in the package.
+`SOFTWARE_VERSIONS.tsv` is a provenance inventory; the files under
+`environment/` are the installable environment specifications.

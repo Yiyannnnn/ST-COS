@@ -5,279 +5,24 @@ suppressPackageStartupMessages({
   library(ggplot2)
 })
 
+local({
+  a <- commandArgs(trailingOnly = FALSE)
+  f <- sub("^--file=", "", a[grepl("^--file=", a)])
+  here <- if (length(f) == 1L) dirname(normalizePath(f)) else getwd()
+  rules <- c(Sys.getenv("STCOS_EVALUATION_RULES"),
+             file.path(here, "..", "evaluation_rules.R"),
+             file.path(getwd(), "evaluation_rules.R"))
+  rules <- rules[nzchar(rules) & file.exists(rules)]
+  if (!length(rules)) stop("Cannot find evaluation_rules.R; set STCOS_EVALUATION_RULES.")
+  source(rules[1L], local = globalenv())
+})
+
 base_dir <- "."
 coexp_dir <- file.path(base_dir, "coexpression")
 
-a_align_matrix <- function(mat, n) {
-  if (is.null(mat)) return(NULL)
-  m <- suppressWarnings(as.matrix(mat))
-  if (!is.numeric(m)) {
-    storage.mode(m) <- "numeric"
-  }
-  m[!is.finite(m)] <- 0
-  nr <- nrow(m)
-  nc <- ncol(m)
-  if (is.null(nr) || is.null(nc) || nr == 0 || nc == 0) return(NULL)
-  k <- min(n, nr, nc)
-  out <- matrix(0, nrow = n, ncol = n)
-  out[1:k, 1:k] <- m[1:k, 1:k]
-  diag(out) <- 0
-  out
-}
-
-extract_index <- function(x) {
-  if (is.null(x)) return(integer(0))
-  x <- as.character(x)
-  out <- suppressWarnings(as.integer(sub(".*?(\\d+)$", "\\1", x)))
-  out
-}
-
-create_truth_matrix <- function(scenario, n) {
-  truth <- matrix(0, nrow = n, ncol = n)
-  truth_file <- file.path(base_dir, "Data", paste0(scenario, "_gene"), "simulated", paste0(scenario, "_coexpression_truth.csv"))
-
-  if (file.exists(truth_file)) {
-    dt <- fread(truth_file)
-    if ("gene_index" %in% names(dt)) {
-      dt[, idx := as.integer(gene_index)]
-    } else if ("gene_id" %in% names(dt)) {
-      dt[, idx := extract_index(gene_id)]
-    } else {
-      dt[, idx := NA_integer_]
-    }
-
-    module_col <- if ("module_id" %in% names(dt)) {
-      "module_id"
-    } else if ("module_label" %in% names(dt)) {
-      "module_label"
-    } else {
-      NULL
-    }
-
-    dt <- dt[!is.na(idx) & idx >= 1 & idx <= n]
-
-    if (!is.null(module_col) && nrow(dt) > 0) {
-      for (m in unique(dt[[module_col]])) {
-        ids <- unique(dt[get(module_col) == m, idx])
-        if (length(ids) > 1) {
-          truth[ids, ids] <- 1
-        }
-      }
-    }
-  } else if (scenario %in% c("S4", "S5", "S6")) {
-    blocks <- list(1:5, 6:10, 11:15)
-    for (b in blocks) {
-      ids <- b[b <= n]
-      if (length(ids) > 1) {
-        truth[ids, ids] <- 1
-      }
-    }
-  }
-
-  diag(truth) <- 0
-  truth
-}
-
-compute_metrics <- function(pred, truth, threshold = 0.25) {
-  pred_bin <- ifelse(abs(pred) >= threshold, 1L, 0L)
-  true_bin <- ifelse(truth > 0, 1L, 0L)
-
-  tri <- upper.tri(true_bin, diag = FALSE)
-  p <- pred_bin[tri]
-  t <- true_bin[tri]
-  n_positive_truth <- sum(t == 1L)
-  has_positive_truth <- n_positive_truth > 0L
-
-  tp <- sum(p == 1L & t == 1L)
-  fp <- sum(p == 1L & t == 0L)
-  tn <- sum(p == 0L & t == 0L)
-  fn <- sum(p == 0L & t == 1L)
-
-  precision <- if ((tp + fp) > 0) tp / (tp + fp) else 0
-  recall <- if (has_positive_truth) tp / (tp + fn) else NA_real_
-  f1 <- if (has_positive_truth && (precision + recall) > 0) {
-    2 * precision * recall / (precision + recall)
-  } else if (has_positive_truth) {
-    0
-  } else {
-    NA_real_
-  }
-  tpr <- recall
-  fpr <- if ((fp + tn) > 0) fp / (fp + tn) else 0
-
-  c(
-    F1 = f1,
-    TPR = tpr,
-    FPR = fpr,
-    TP = tp,
-    FP = fp,
-    TN = tn,
-    FN = fn,
-    has_positive_truth = as.integer(has_positive_truth),
-    n_positive_truth = as.integer(n_positive_truth)
-  )
-}
-
-load_spacex <- function(scenario, rep_id, n) {
-  f <- file.path(base_dir, "Data", paste0(scenario, "_gene"), paste0("SpaceX_", rep_id, ".csv"))
-  if (!file.exists(f)) return(NULL)
-  mat <- as.matrix(fread(f))
-  a_align_matrix(mat, n)
-}
-
-load_spmoca <- function(scenario, rep_id, n) {
-  f <- file.path(coexp_dir, "spMOCA_Agent", paste0(scenario, "_", rep_id, "_correlation_matrix.csv"))
-  if (!file.exists(f)) return(NULL)
-  mat <- as.matrix(fread(f))
-  a_align_matrix(mat, n)
-}
-
-load_cssn <- function(scenario, rep_id, n) {
-  f_mean <- file.path(coexp_dir, "CSSN", paste0(scenario, "_", rep_id, "_mean_coexpression_network.csv"))
-  if (file.exists(f_mean)) {
-    mat <- as.matrix(fread(f_mean))
-    return(a_align_matrix(mat, n))
-  }
-
-  f <- file.path(coexp_dir, "CSSN", paste0(scenario, "_", rep_id, "_CSSN_subset_results.rds"))
-  if (!file.exists(f)) return(NULL)
-
-  obj <- tryCatch(readRDS(f), error = function(e) NULL)
-  if (is.null(obj)) return(NULL)
-
-  corr_list <- obj[["Correlation Matrix"]]
-  if (is.list(corr_list)) {
-    agg <- matrix(0, nrow = n, ncol = n)
-    n_ok <- 0L
-    for (i in seq_along(corr_list)) {
-      cur <- corr_list[[i]]
-      dm <- tryCatch(dim(cur), error = function(e) NULL)
-      if (is.null(dm) || length(dm) != 2 || any(dm < 1)) next
-      k <- min(n, dm[1], dm[2])
-      sub <- tryCatch(as.matrix(cur[1:k, 1:k]), error = function(e) NULL)
-      if (is.null(sub)) next
-      tmp <- matrix(0, nrow = n, ncol = n)
-      tmp[1:k, 1:k] <- sub
-      agg <- agg + abs(tmp)
-      n_ok <- n_ok + 1L
-    }
-    if (n_ok == 0L) return(NULL)
-    agg <- agg / n_ok
-    diag(agg) <- 0
-    return(agg)
-  }
-
-  a_align_matrix(obj, n)
-}
-
-load_hdwgcna <- function(scenario, rep_id, n) {
-  f <- file.path(coexp_dir, "hdWGCNA_Agent", paste0(scenario, "_", rep_id, "_modules.csv"))
-  if (!file.exists(f)) return(NULL)
-
-  dt <- fread(f)
-  out <- matrix(0, nrow = n, ncol = n)
-  if (nrow(dt) == 0) return(out)
-
-  gene_col <- if ("gene_name" %in% names(dt)) "gene_name" else names(dt)[1]
-  mod_col <- if ("module" %in% names(dt)) "module" else names(dt)[2]
-
-  idx <- extract_index(dt[[gene_col]])
-  module <- as.character(dt[[mod_col]])
-  keep <- !is.na(idx) & idx >= 1 & idx <= n & !is.na(module) & module != "" & module != "grey"
-
-  if (!any(keep)) return(out)
-
-  dt2 <- data.table(idx = idx[keep], module = module[keep])
-  for (m in unique(dt2$module)) {
-    ids <- unique(dt2[module == m, idx])
-    if (length(ids) > 1) out[ids, ids] <- 1
-  }
-  diag(out) <- 0
-  out
-}
-
-load_smoothie <- function(scenario, rep_id, n) {
-  f <- file.path(coexp_dir, "smoothie_Agent", paste0(scenario, "_", rep_id, "_edge_list.csv"))
-  if (!file.exists(f)) return(NULL)
-
-  dt <- fread(f)
-  out <- matrix(0, nrow = n, ncol = n)
-  if (nrow(dt) == 0) return(out)
-
-  g1_col <- if ("gene1" %in% names(dt)) "gene1" else names(dt)[1]
-  g2_col <- if ("gene2" %in% names(dt)) "gene2" else names(dt)[2]
-  score_col <- if ("PCC" %in% names(dt)) "PCC" else if ("Rescaled_PCC" %in% names(dt)) "Rescaled_PCC" else NULL
-
-  idx1 <- extract_index(dt[[g1_col]])
-  idx2 <- extract_index(dt[[g2_col]])
-  score <- if (!is.null(score_col)) abs(as.numeric(dt[[score_col]])) else rep(1, nrow(dt))
-
-  keep <- !is.na(idx1) & !is.na(idx2) & idx1 >= 1 & idx1 <= n & idx2 >= 1 & idx2 <= n
-  if (!any(keep)) return(out)
-
-  idx1 <- idx1[keep]
-  idx2 <- idx2[keep]
-  score <- score[keep]
-
-  for (i in seq_along(idx1)) {
-    a <- idx1[i]
-    b <- idx2[i]
-    v <- score[i]
-    if (!is.finite(v)) v <- 0
-    if (abs(v) > abs(out[a, b])) {
-      out[a, b] <- v
-      out[b, a] <- v
-    }
-  }
-
-  diag(out) <- 0
-  out
-}
-
-load_binspect <- function(scenario, rep_id, n) {
-  f1 <- file.path(coexp_dir, "binSpect_agent", paste0(scenario, "_", rep_id, "_correlation_matrix.csv"))
-  f2 <- file.path(coexp_dir, "binSpect_Agent", paste0(scenario, "_", rep_id, "_correlation_matrix.csv"))
-  f <- if (file.exists(f1)) f1 else if (file.exists(f2)) f2 else NULL
-  if (is.null(f)) return(NULL)
-  mat <- as.matrix(fread(f))
-  a_align_matrix(mat, n)
-}
-
-load_stihc <- function(scenario, rep_id, n) {
-  f <- file.path(coexp_dir, "stIHC_Agent", paste0(scenario, "_gene_stIHC_", rep_id, ".RDS"))
-  if (!file.exists(f)) return(NULL)
-
-  obj <- tryCatch(readRDS(f), error = function(e) NULL)
-  if (is.null(obj)) return(NULL)
-
-  labels <- obj$label
-  if (is.null(labels)) return(NULL)
-  if (is.list(labels) && "label" %in% names(labels)) labels <- labels$label
-  if (!is.atomic(labels)) labels <- unlist(labels)
-
-  labels <- as.character(labels)
-  L <- min(length(labels), n)
-  if (L < 1) return(NULL)
-
-  out <- matrix(0, nrow = n, ncol = n)
-  labels <- labels[1:L]
-  for (lab in unique(labels)) {
-    ids <- which(labels == lab)
-    if (length(ids) > 1) out[ids, ids] <- 1
-  }
-  diag(out) <- 0
-  out
-}
-
-methods <- list(
-  spMOCA = load_spmoca,
-  SpaceX = load_spacex,
-  CSSN = load_cssn,
-  hdWGCNA = load_hdwgcna,
-  Smoothie = load_smoothie,
-  binSpect = load_binspect,
-  stIHC = load_stihc
-)
+# Edge rule, truth, loaders, and metrics follow Supplementary Methods S2 and are
+# defined in evaluation_rules.R.
+method_names <- c("spMOCA", "SpaceX", "CSSN", "hdWGCNA", "Smoothie", "binSpect", "stIHC")
 
 scenarios <- paste0("S", 1:7)
 replicates <- 1:5
@@ -288,16 +33,34 @@ row_id <- 1L
 miss_id <- 1L
 
 for (scenario in scenarios) {
+  sim_dir <- sim_dir_for(base_dir, scenario)
   for (rep_id in replicates) {
-    coord_file <- file.path(base_dir, "Data", paste0(scenario, "_gene"), "simulated", paste0(scenario, "_coord_", rep_id, ".csv"))
-    expr_file <- file.path(base_dir, "Data", paste0(scenario, "_gene"), "simulated", paste0(scenario, "_gene_expression_", rep_id, ".csv"))
+    coord_file <- file.path(sim_dir, paste0(scenario, "_coord_", rep_id, ".csv"))
+    expr_file <- file.path(sim_dir, paste0(scenario, "_gene_expression_", rep_id, ".csv"))
     if (!file.exists(coord_file) || !file.exists(expr_file)) next
 
-    n_eval <- ncol(fread(expr_file))
-    truth <- create_truth_matrix(scenario, n_eval)
+    n_eval <- ncol(fread(expr_file, nrows = 0))
+    truth <- coexp_truth_matrix(sim_dir, scenario, rep_id, n_eval)
+    if (is.null(truth)) {
+      for (method_name in method_names) {
+        missing_rows[[miss_id]] <- data.table(
+          scenario = scenario,
+          replicate = rep_id,
+          method = method_name,
+          status = "missing_truth"
+        )
+        miss_id <- miss_id + 1L
+      }
+      next
+    }
+    truth_source <- attr(truth, "truth_source")
+    if (is.null(truth_source)) truth_source <- "generator_definition"
 
-    for (method_name in names(methods)) {
-      pred <- tryCatch(methods[[method_name]](scenario, rep_id, n_eval), error = function(e) NULL)
+    for (method_name in method_names) {
+      pred <- tryCatch(
+        load_coexp_prediction(base_dir, scenario, rep_id, method_name, n_eval),
+        error = function(e) NULL
+      )
 
       if (is.null(pred)) {
         missing_rows[[miss_id]] <- data.table(
@@ -310,21 +73,29 @@ for (scenario in scenarios) {
         next
       }
 
-      met <- compute_metrics(pred, truth, threshold = 0.25)
+      met <- coexp_metrics(
+        pred, truth,
+        continuous = method_name %in% COEXP_CONTINUOUS_METHODS
+      )
       all_rows[[row_id]] <- data.table(
         scenario = scenario,
         replicate = rep_id,
         method = method_name,
-        F1 = as.numeric(met[["F1"]]),
-        TPR = as.numeric(met[["TPR"]]),
-        FPR = as.numeric(met[["FPR"]]),
-        TP = as.integer(met[["TP"]]),
-        FP = as.integer(met[["FP"]]),
-        TN = as.integer(met[["TN"]]),
-        FN = as.integer(met[["FN"]]),
-        has_positive_truth = as.logical(met[["has_positive_truth"]]),
-        n_positive_truth = as.integer(met[["n_positive_truth"]]),
-        n_eval = n_eval
+        F1 = met$F1,
+        TPR = met$TPR,
+        FPR = met$FPR,
+        precision = met$precision,
+        Jaccard = met$Jaccard,
+        AUPRC = met$AUPRC,
+        TP = as.integer(met$tp),
+        FP = as.integer(met$fp),
+        TN = as.integer(met$tn),
+        FN = as.integer(met$fn),
+        has_positive_truth = met$has_positive_truth,
+        n_positive_truth = as.integer(met$n_positive_truth),
+        n_eval = n_eval,
+        edge_threshold = COEXP_EDGE_THRESHOLD,
+        truth_source = truth_source
       )
       row_id <- row_id + 1L
     }
@@ -441,34 +212,24 @@ ggsave(
   bg = "white"
 )
 
-summary_dt <- metrics_dt[, .(
-  n = .N,
-  n_F1 = sum(!is.na(F1)),
-  n_TPR = sum(!is.na(TPR)),
-  n_FPR = sum(!is.na(FPR)),
-  mean_F1 = if (all(is.na(F1))) NA_real_ else mean(F1, na.rm = TRUE),
-  median_F1 = if (all(is.na(F1))) NA_real_ else median(F1, na.rm = TRUE),
-  sd_F1 = if (sum(!is.na(F1)) > 1L) sd(F1, na.rm = TRUE) else NA_real_,
-  mean_TPR = if (all(is.na(TPR))) NA_real_ else mean(TPR, na.rm = TRUE),
-  median_TPR = if (all(is.na(TPR))) NA_real_ else median(TPR, na.rm = TRUE),
-  sd_TPR = if (sum(!is.na(TPR)) > 1L) sd(TPR, na.rm = TRUE) else NA_real_,
-  mean_FPR = if (all(is.na(FPR))) NA_real_ else mean(FPR, na.rm = TRUE),
-  median_FPR = if (all(is.na(FPR))) NA_real_ else median(FPR, na.rm = TRUE),
-  sd_FPR = if (sum(!is.na(FPR)) > 1L) sd(FPR, na.rm = TRUE) else NA_real_
-), by = .(scenario, method)]
-summary_dt[, `:=`(
-  se_F1 = sd_F1 / sqrt(n_F1),
-  se_TPR = sd_TPR / sqrt(n_TPR),
-  se_FPR = sd_FPR / sqrt(n_FPR)
-)]
-summary_dt[, `:=`(
-  ci_low_F1 = mean_F1 - qt(0.975, pmax(n_F1 - 1L, 1L)) * se_F1,
-  ci_high_F1 = mean_F1 + qt(0.975, pmax(n_F1 - 1L, 1L)) * se_F1,
-  ci_low_TPR = mean_TPR - qt(0.975, pmax(n_TPR - 1L, 1L)) * se_TPR,
-  ci_high_TPR = mean_TPR + qt(0.975, pmax(n_TPR - 1L, 1L)) * se_TPR,
-  ci_low_FPR = mean_FPR - qt(0.975, pmax(n_FPR - 1L, 1L)) * se_FPR,
-  ci_high_FPR = mean_FPR + qt(0.975, pmax(n_FPR - 1L, 1L)) * se_FPR
-)]
+summary_metrics <- c("F1", "TPR", "FPR", "precision", "Jaccard", "AUPRC")
+summarise_metric <- function(x) {
+  n <- sum(!is.na(x))
+  m <- mean_or_na(x)
+  s <- if (n > 1L) sd(x, na.rm = TRUE) else NA_real_
+  half <- if (n > 1L) qt(0.975, n - 1L) * s / sqrt(n) else NA_real_
+  list(n = n, mean = m, median = if (n > 0L) median(x, na.rm = TRUE) else NA_real_,
+       sd = s, ci_low = m - half, ci_high = m + half)
+}
+summary_dt <- metrics_dt[, {
+  out <- list(n = .N)
+  for (metric in summary_metrics) {
+    st <- summarise_metric(get(metric))
+    names(st) <- paste0(names(st), "_", metric)
+    out <- c(out, st)
+  }
+  out
+}, by = .(scenario, method)]
 fwrite(summary_dt, file.path(coexp_dir, "coexpression_method_summary.csv"))
 
 cat("Saved:\n")

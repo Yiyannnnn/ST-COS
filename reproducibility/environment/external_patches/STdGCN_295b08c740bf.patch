@@ -1,0 +1,29 @@
+diff --git a/STdGCN/utils.py b/STdGCN/utils.py
+index dad5d00..ad2e565 100644
+--- a/STdGCN/utils.py
++++ b/STdGCN/utils.py
+@@ -5,7 +5,7 @@ import pandas as pd
+ import scanpy as sc
+ import anndata
+ import multiprocessing
+-from tqdm.notebook import tqdm
++from tqdm import std as tqdm_std
+ import random
+ from sklearn.decomposition import NMF
+ 
+@@ -182,7 +182,7 @@ def pseudo_spot_generation(sc_exp,
+     else:
+         pool = multiprocessing.Pool(processes=n_jobs)
+     args = [(sc_exp, min_cell_number_in_spot, max_cell_number_in_spot, max_cell_types_in_spot, generation_method) for i in range(spot_num)]
+-    generated_spots = pool.starmap(generate_a_spot, tqdm(args, desc='Generating pseudo-spots'))
++    generated_spots = pool.starmap(generate_a_spot, tqdm_std.tqdm(args, desc='Generating pseudo-spots'))
+     
+     pseudo_spots = []
+     pseudo_spots_table = np.zeros((spot_num, sc_exp.shape[1]), dtype=float)
+@@ -355,4 +355,4 @@ def data_integration(real,
+     table.insert(1, 'cell_num', real.obs['cell_num'].values.tolist()+pseudo.obs['cell_num'].values.tolist())
+     table.insert(2, 'cell_type_num', real.obs['cell_type_num'].values.tolist()+pseudo.obs['cell_type_num'].values.tolist())
+ 
+-    return table
+\ No newline at end of file
++    return table

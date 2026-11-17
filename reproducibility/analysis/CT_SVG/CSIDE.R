@@ -64,9 +64,6 @@ nUMI_cells <- colSums(sc_counts)
 
 reference <- Reference(sc_counts, as.factor(cell_types), nUMI_cells)
 
-default_ct <- sort(unique(as.character(cell_types)))
-empty_sig <- setNames(vector("list", length(default_ct)), default_ct)
-
 myRCTD <- tryCatch(
   create.RCTD(puck, reference, max_cores = 2),
   error = function(e) {
@@ -75,9 +72,7 @@ myRCTD <- tryCatch(
   }
 )
 if (is.null(myRCTD)) {
-  saveRDS(empty_sig, file.path(base_dir, paste0("CSIDE", suffix, ".RDS")))
-  saveRDS(empty_sig, file.path(base_dir, paste0("CSIDE_trueprop", suffix, ".RDS")))
-  quit(save = "no", status = 0)
+  stop("create.RCTD failed for ", dataset_id, suffix, "; no C-SIDE output was written.")
 }
 
 myRCTD <- tryCatch(
@@ -88,9 +83,7 @@ myRCTD <- tryCatch(
   }
 )
 if (is.null(myRCTD)) {
-  saveRDS(empty_sig, file.path(base_dir, paste0("CSIDE", suffix, ".RDS")))
-  saveRDS(empty_sig, file.path(base_dir, paste0("CSIDE_trueprop", suffix, ".RDS")))
-  quit(save = "no", status = 0)
+  stop("run.RCTD failed for ", dataset_id, suffix, "; no C-SIDE output was written.")
 }
 
 build_truth <- function() {
@@ -124,10 +117,12 @@ build_truth <- function() {
       ct3 = rep(1 / 3, nrow(layer_dt))
     )
   } else {
+    # Row-normalized S2/S3/S5/S6 generator weights:
+    # ct1 = (1/2, 0, 0), ct2 = (1/4, 3/4, 0), ct3 = (1/3, 0, 1).
     truth_df <- data.frame(
-      ct1 = ifelse(layer_dt$layer == 1, 1 / 2, ifelse(layer_dt$layer == 2, 1 / 4, 0)),
-      ct2 = ifelse(layer_dt$layer == 1, 1 / 4, ifelse(layer_dt$layer == 2, 3 / 4, 0)),
-      ct3 = ifelse(layer_dt$layer == 1, 1 / 4, ifelse(layer_dt$layer == 2, 0, 1))
+      ct1 = ifelse(layer_dt$layer == 1, 6 / 13, 0),
+      ct2 = ifelse(layer_dt$layer == 1, 3 / 13, ifelse(layer_dt$layer == 2, 1, 0)),
+      ct3 = ifelse(layer_dt$layer == 1, 4 / 13, ifelse(layer_dt$layer == 3, 1, 0))
     )
   }
   truth_mat <- as.matrix(truth_df)
@@ -161,35 +156,58 @@ extract_sig_genes <- function(rctd_obj, cell_types) {
   out
 }
 
-safe_run_cside <- function(rctd_obj) {
+# C-SIDE's significant genes (sig_gene_list) are called at FDR 0.05 alone, as
+# stated in Supplementary Methods S2: the default log fold-change filter is
+# disabled. The full per-gene results are saved for re-thresholding.
+CSIDE_FDR <- 0.05
+CSIDE_LOG_FC_THRESH <- 0
+
+safe_run_cside <- function(rctd_obj, label) {
   tryCatch({
     run.CSIDE.single(
       rctd_obj,
       gene_threshold = 0,
       cell_type_threshold = 0,
       explanatory.variable = explanatory.variable,
-      doublet_mode = FALSE
+      doublet_mode = FALSE,
+      fdr = CSIDE_FDR,
+      log_fc_thresh = CSIDE_LOG_FC_THRESH
     )
   }, error = function(e) {
-    message("Error in CSIDE analysis: ", e$message)
-    invisible(NULL)
+    message("C-SIDE ", label, " failed: ", e$message)
+    NULL
   })
 }
 
-myRCTD_est <- safe_run_cside(myRCTD)
-if (!is.null(myRCTD_est)) {
-  myRCTD <- myRCTD_est
+failed <- character(0)
+save_cside <- function(rctd_obj, output_prefix) {
+  saveRDS(extract_sig_genes(rctd_obj, region_ct_cols),
+          file.path(base_dir, paste0(output_prefix, suffix, ".RDS")))
+  saveRDS(rctd_obj@de_results$all_gene_list,
+          file.path(base_dir, paste0(output_prefix, suffix, "_all_genes.RDS")))
 }
-sig_est <- extract_sig_genes(myRCTD, region_ct_cols)
-saveRDS(sig_est, file.path(base_dir, paste0("CSIDE", suffix, ".RDS")))
 
+myRCTD_est <- safe_run_cside(myRCTD, "estimated")
+if (is.null(myRCTD_est)) {
+  failed <- c(failed, "CSIDE")
+} else {
+  save_cside(myRCTD_est, "CSIDE")
+}
+
+# The trueprop run starts from the RCTD object with true weights, never from
+# the estimated-proportion C-SIDE results.
 truth_sparse <- as(as.matrix(truth_mat), "dgCMatrix")
 rownames(truth_sparse) <- spot_ids
-myRCTD@results$weights <- truth_sparse
+myRCTD_truthweights <- myRCTD
+myRCTD_truthweights@results$weights <- truth_sparse
 
-myRCTD_truth <- safe_run_cside(myRCTD)
-if (!is.null(myRCTD_truth)) {
-  myRCTD <- myRCTD_truth
+myRCTD_truth <- safe_run_cside(myRCTD_truthweights, "trueprop")
+if (is.null(myRCTD_truth)) {
+  failed <- c(failed, "CSIDE_trueprop")
+} else {
+  save_cside(myRCTD_truth, "CSIDE_trueprop")
 }
-sig_truth <- extract_sig_genes(myRCTD, region_ct_cols)
-saveRDS(sig_truth, file.path(base_dir, paste0("CSIDE_trueprop", suffix, ".RDS")))
+
+if (length(failed) > 0L) {
+  stop("C-SIDE runs failed for ", dataset_id, suffix, ": ", paste(failed, collapse = ", "))
+}

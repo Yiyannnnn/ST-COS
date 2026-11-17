@@ -4,16 +4,24 @@
 \alias{generate_cell_prop}
 \title{Generate cell proportion layers}
 \usage{
-generate_cell_prop(layer_coord, layer_param)
+generate_cell_prop(layer_coord, layer_param, noise_sd = 1e-04)
 }
 \arguments{
 \item{layer_coord}{Coordinate matrix with layer assignments}
 
-\item{layer_param}{Layer parameters matrix}
+\item{layer_param}{Finite layer-by-cell-type mean logits
+\eqn{\gamma_{i,c}}.}
+
+\item{noise_sd}{Standard deviation \eqn{\tau} of the per-layer Gaussian
+perturbation of each logit.}
 }
 \value{
 Matrix of cell type proportions
 }
 \description{
-Generate cell proportion layers
+Raw abundance parameters \eqn{\alpha_{i,c} \sim N(\gamma_{i,c}, \tau^2)}
+are drawn once per layer \eqn{i} and cell type \eqn{c}, exponentiated, and
+normalized across cell types, so every spot \eqn{j} in layer \eqn{i(j)}
+receives \eqn{p_{jc} = \exp(\alpha_{i(j),c}) / \sum_{c'}
+\exp(\alpha_{i(j),c'})}.
 }

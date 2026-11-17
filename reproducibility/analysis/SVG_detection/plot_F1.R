@@ -2,6 +2,18 @@ library(data.table)
 library(ggplot2)
 library(stringr)
 
+local({
+  a <- commandArgs(trailingOnly = FALSE)
+  f <- sub("^--file=", "", a[grepl("^--file=", a)])
+  here <- if (length(f) == 1L) dirname(normalizePath(f)) else getwd()
+  rules <- c(Sys.getenv("STCOS_EVALUATION_RULES"),
+             file.path(here, "..", "evaluation_rules.R"),
+             file.path(getwd(), "evaluation_rules.R"))
+  rules <- rules[nzchar(rules) & file.exists(rules)]
+  if (!length(rules)) stop("Cannot find evaluation_rules.R; set STCOS_EVALUATION_RULES.")
+  source(rules[1L], local = globalenv())
+})
+
 base_dir <- "."
 
 method_order <- c("moranI", "HEARTSVG", "SPARK", "SPARKX", "SpatialDE", "SpatialDE2")
@@ -28,41 +40,11 @@ get_reps <- function(scenario) {
   reps
 }
 
+# Truth genes and decision rules are defined in evaluation_rules.R
+# (Supplementary Methods S2): adjusted P <= 0.05, with BH applied when a
+# method reports only unadjusted P values.
 get_truth_genes <- function(scenario, rep_id) {
-  truth_path <- file.path(
-    base_dir, "Data", paste0(scenario, "_gene"), "simulated", paste0(scenario, "_marker_gene_truth.csv")
-  )
-
-  if (file.exists(truth_path)) {
-    truth_dt <- fread(truth_path)
-    if ("scenario" %in% colnames(truth_dt)) {
-      genes <- unique(truth_dt[scenario == rep_id, gene_id])
-    } else if ("gene_id" %in% colnames(truth_dt)) {
-      genes <- unique(truth_dt$gene_id)
-    } else {
-      genes <- character(0)
-    }
-    genes <- genes[!is.na(genes)]
-    if (length(genes) > 0) {
-      return(genes)
-    }
-  }
-
-  # S1-S6 predate explicit truth files. S2 and S5 intentionally contain no
-  # marginal SVGs; the remaining legacy scenarios use genes 1-15.
-  if (scenario %in% c("S2", "S5")) {
-    return(character(0))
-  }
-  if (scenario %in% c("S1", "S3", "S4", "S6")) {
-    return(paste0("gene_", 1:15))
-  }
-  stop("No SVG truth definition found for ", scenario, " replicate ", rep_id, ".")
-}
-
-calc_f1 <- function(tp, fp, fn) {
-  precision <- ifelse(tp + fp == 0, 0, tp / (tp + fp))
-  recall <- ifelse(tp + fn == 0, 0, tp / (tp + fn))
-  ifelse(precision + recall == 0, 0, 2 * precision * recall / (precision + recall))
+  svg_truth_genes(sim_dir_for(base_dir, scenario), scenario, rep_id)
 }
 
 get_gene_col <- function(dt, candidates) {
@@ -71,39 +53,7 @@ get_gene_col <- function(dt, candidates) {
   hit[1]
 }
 
-get_pred_vec <- function(dt, method) {
-  if (method == "moranI") {
-    if (!("pval_norm_fdr_bh" %in% colnames(dt))) return(NULL)
-    return(as.integer(dt$pval_norm_fdr_bh <= 0.05))
-  }
-  if (method == "HEARTSVG") {
-    if (!("p_adj" %in% colnames(dt))) return(NULL)
-    return(as.integer(dt$p_adj <= 0.05))
-  }
-  if (method == "SPARK") {
-    if (!("adjusted_pvalue" %in% colnames(dt))) return(NULL)
-    return(as.integer(dt$adjusted_pvalue <= 0.05))
-  }
-  if (method == "SPARKX") {
-    if (!("adjustedPval" %in% colnames(dt))) return(NULL)
-    return(as.integer(dt$adjustedPval <= 0.05))
-  }
-  if (method == "SpatialDE") {
-    if ("qval" %in% colnames(dt)) {
-      return(as.integer(dt$qval <= 0.05))
-    }
-    if ("pval" %in% colnames(dt)) {
-      return(as.integer(dt$pval <= 0.05))
-    }
-    return(NULL)
-  }
-  if (method == "SpatialDE2") {
-    if (!("FSV" %in% colnames(dt))) return(NULL)
-    thr <- as.numeric(quantile(dt$FSV, probs = 0.9, na.rm = TRUE))
-    return(as.integer(dt$FSV >= thr))
-  }
-  NULL
-}
+get_pred_vec <- function(dt, method) svg_calls(dt, method)
 
 collect_metrics <- function(scenario) {
   reps <- get_reps(scenario)
@@ -124,6 +74,7 @@ collect_metrics <- function(scenario) {
       if (is.null(dt) || nrow(dt) == 0) next
 
       truth_genes <- get_truth_genes(scenario, rep_id)
+      if (is.null(truth_genes)) next
       gene_col <- get_gene_col(dt, c("gene", "g", "V1", "Unnamed: 0"))
       if (is.na(gene_col)) next
       pred <- get_pred_vec(dt, method_name)
@@ -135,29 +86,21 @@ collect_metrics <- function(scenario) {
       pred <- pred[keep]
       if (length(genes) == 0 || length(pred) == 0) next
 
-      is_truth <- genes %in% truth_genes
-
-      tp <- sum(pred[is_truth] == 1, na.rm = TRUE)
-      fp <- sum(pred[!is_truth] == 1, na.rm = TRUE)
-      fn <- sum(pred[is_truth] == 0, na.rm = TRUE)
-      tn <- sum(pred[!is_truth] == 0, na.rm = TRUE)
-      has_positive_truth <- length(truth_genes) > 0L
-      tpr <- if (has_positive_truth) tp / (tp + fn) else NA_real_
-      fpr <- ifelse(fp + tn == 0, 0, fp / (fp + tn))
-      f1 <- if (has_positive_truth) calc_f1(tp, fp, fn) else NA_real_
+      met <- gene_set_metrics(genes[pred == 1L], truth_genes, genes)
 
       rows[[idx]] <- data.table(
         scenario = scenario,
         rep = rep_id,
         method = method_name,
-        tp = tp,
-        fp = fp,
-        fn = fn,
-        tn = tn,
-        has_positive_truth = has_positive_truth,
-        TPR = as.numeric(tpr),
-        FPR = as.numeric(fpr),
-        F1_score = as.numeric(f1)
+        tp = met$tp,
+        fp = met$fp,
+        fn = met$fn,
+        tn = met$tn,
+        has_positive_truth = met$has_positive_truth,
+        precision = met$precision,
+        TPR = met$TPR,
+        FPR = met$FPR,
+        F1_score = met$F1
       )
       idx <- idx + 1L
     }

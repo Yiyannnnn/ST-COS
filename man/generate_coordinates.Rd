@@ -10,7 +10,7 @@ generate_coordinates(
   pattern,
   spot_distance = NULL,
   n_spot = NULL,
-  seed = 123
+  seed = NULL
 )
 }
 \arguments{
@@ -24,7 +24,9 @@ generate_coordinates(
 
 \item{n_spot}{Number of spots (for random pattern)}
 
-\item{seed}{Random seed}
+\item{seed}{Optional seed passed to \code{\link[=set.seed]{set.seed()}} before drawing random
+coordinates. \code{NULL} (the default) uses the current random-number state.
+Supplying a seed resets the global random-number generator.}
 }
 \value{
 data.table with x and y coordinates

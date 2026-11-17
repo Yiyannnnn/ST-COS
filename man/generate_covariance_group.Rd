@@ -2,16 +2,28 @@
 % Please edit documentation in R/covariance.R
 \name{generate_covariance_group}
 \alias{generate_covariance_group}
-\title{Generate group-based covariance matrix}
+\title{Generate group-based latent covariance blocks}
 \usage{
 generate_covariance_group(gene_relationship)
 }
 \arguments{
-\item{gene_relationship}{Matrix indicating gene group relationships}
+\item{gene_relationship}{Data frame with one row per gene and one column
+per cell type; entries are group labels, with \code{NA} for genes outside any
+block.}
 }
 \value{
-Array of covariance matrices
+Gene-by-gene-by-cell-type covariance array.
 }
 \description{
-Generate group-based covariance matrix
+For each cell type and each group label in \code{gene_relationship}, the genes
+carrying that label form one block: the matrix exponential, \code{\link[expm:expm]{expm::expm()}},
+of \eqn{A + A^\top} with \eqn{A_{ij} = |Z_{ij}|} and
+\eqn{Z_{ij} \sim N(0, 1)}. Blocks are positive definite with positive
+entries; genes in different groups are uncorrelated. Because the matrix
+exponential is dominated by its leading eigenvector, the implied latent
+correlations are close to one (median about 0.997 for five-gene blocks),
+and blocks of ten or more genes are numerically singular before the
+eigenvalue repair in \code{\link[=generate_true_count]{generate_true_count()}}. To impose specific latent
+correlation values, supply correlation matrices to \code{\link[=generate_true_count]{generate_true_count()}}
+instead.
 }

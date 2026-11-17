@@ -1,6 +1,20 @@
+#!/usr/bin/env Rscript
 
+suppressPackageStartupMessages({
+  library(data.table)
+  library(dplyr)
+  library(egg)
+  library(ggplot2)
+})
 
-source("./Data/simulator_YZ.R")
+scenario_output_dir <- function(scenario) {
+  root <- Sys.getenv("STCOS_OUTPUT_ROOT", unset = "")
+  if (!nzchar(root)) {
+    return(file.path(".", "Data", paste0(scenario, "_gene"), "simulated"))
+  }
+  file.path(normalizePath(root, mustWork = FALSE),
+            paste0(scenario, "_gene"), "simulated")
+}
 
 args <- commandArgs(trailingOnly = TRUE)
 rep_id <- if (length(args) >= 1L) suppressWarnings(as.integer(args[1])) else 1L
@@ -21,9 +35,10 @@ gene_pattern = data.frame(ct1 = c(rep('layer',5),rep('no_pattern',145)),
 
 
 
-layer_param = data.frame(ct1 = c(1/3,1/3,1/3),
-                          ct2 = c(1/3,1/3,1/3),
-                          ct3 = c(1/3,1/3,1/3))
+layer_weights <- data.frame(ct1 = c(1/3,1/3,1/3),
+                            ct2 = c(1/3,1/3,1/3),
+                            ct3 = c(1/3,1/3,1/3))
+layer_param <- log(as.matrix(layer_weights))
 
 #define layer
 xmin <- c(0, 33, 66)
@@ -33,18 +48,21 @@ ymax <- c(100, 100, 100)
 
 rownames(gene_pattern) = paste0('gene',1:nGenes)
 
-coord = generate_coordinates(x_len,y_len,'hex',spot_distance=5,seed=rep_seed)
-mean_param = generate_gene_pattern(coord=coord,gene_pattern=gene_pattern,seed=rep_seed)
-true_count <- generate_true_count(coord,mean_param,gene_relationship = NULL)
-layer_coord <- generate_layer(coord, xmin, xmax, ymin, ymax)
-celltype_proportion <- generate_cell_prop(layer_coord,layer_param)
-true_count <- generate_batch_count(
-  true_count, p0 = 0.05, celltype_proportion = celltype_proportion,
-  seq_depth = 1e6
+coord = STCOS::generate_coordinates(x_len,y_len,'hex',spot_distance=5,seed=rep_seed)
+layer_coord <- STCOS::generate_layer(coord, xmin, xmax, ymin, ymax)
+celltype_proportion <- STCOS::generate_cell_prop(layer_coord,layer_param)
+pattern_args <- list(
+  coord = coord,
+  gene_pattern = gene_pattern,
+  seed = rep_seed,
+  layer_assignments = layer_coord$layer
 )
-spot_count_layers <- generate_spot_count_abundance_weighted(
+mean_param <- do.call(STCOS::generate_gene_pattern, pattern_args)
+true_count <- STCOS::generate_true_count(coord,mean_param,gene_relationship = NULL)
+true_count <- STCOS::generate_batch_count(true_count, p0 = 0.05)
+spot_count_layers <- STCOS::generate_spot_count(
   true_count = true_count, nGenes = nGenes, cell_number = 10,
-  celltype_proportion = celltype_proportion
+  celltype_proportion = celltype_proportion, seq_depth = 1e6
 )
 
 rownames(coord) <- paste0("spot_",1:nrow(coord))
@@ -77,7 +95,8 @@ sc_ref <- rbindlist(lapply(names(true_count), function(x) data.table(Cell_type =
 rownames(sc_ref) <- paste0("cell_",1:nrow(sc_ref))
 colnames(sc_ref)[c(2:ncol(sc_ref))] <- paste0("gene_",1:(ncol(sc_ref)-1))
 
-output_dir <- "./Data/S1_gene/simulated"
+output_dir <- scenario_output_dir("S1")
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 realized_prop <- celltype_proportion
 region_dt <- cbind(
   layer_coord[, .(x_coord, y_coord)],

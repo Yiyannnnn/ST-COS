@@ -1,0 +1,114 @@
+ST-COS EXTERNAL INPUT DECLARATION
+=================================
+
+Scope
+-----
+The reference datasets analyzed in this study are publicly available from the
+original studies and associated resources cited in the manuscript: the human
+dorsolateral prefrontal cortex (DLPFC) Visium dataset (reference 61), mouse
+hypothalamus MERFISH dataset (reference 62), and mouse olfactory bulb
+Stereo-seq dataset distributed through the SEDR study resources (reference
+63). Raw public data are not redistributed with this repository.
+
+URLs identify the public source;
+an accession is reported where the cited resource assigns one. A study or
+repository identifier is given when no formal archive accession is assigned.
+
+
+SHARED REFERENCE-BASED INPUT FORMAT
+-----------------------------------
+Every dataset (each DLPFC section, MERFISH field, and the olfactory bulb
+section) is prepared as two CSV files consumed unchanged by all simulator
+scripts in analysis/Reference_based/ (stcos.R, srtsim.R, scdesign3.R,
+sccube.py):
+
+1. counts.csv: raw counts, one row per gene and one column per observation
+   (spot, cell, or bin). The first column holds unique gene IDs; the header
+   holds unique observation IDs.
+2. coords.csv: one row per observation. The first column holds the
+   observation ID used in counts.csv, followed by numeric columns row and col
+   (spatial coordinates) and an optional label column (domain or cell-type
+   label; one shared label is used when absent).
+
+Recommended location: data_external/prepared/<dataset_id>/counts.csv and
+coords.csv. The dataset sections below state the source files and how each
+maps to this format.
+
+
+1. HUMAN DLPFC VISIUM
+---------------------
+Study: Maynard et al. (2021), manuscript reference 61.
+Study DOI: https://doi.org/10.1038/s41593-020-00787-0
+Accession/resource identifiers:
+  LIBD spatialLIBD/HumanPilot resource; section IDs 151507, 151508, 151509,
+  151510, 151669, 151670, 151671, 151672, 151673, 151674, 151675, and 151676.
+  The cited resource does not assign a single GEO-style accession to this
+  processed 12-section collection.
+
+Public URLs:
+  Counts, one file per section:
+    https://spatial-dlpfc.s3.us-east-2.amazonaws.com/h5/<section>_filtered_feature_bc_matrix.h5
+  Tissue positions, one file per section:
+    https://raw.githubusercontent.com/LieberInstitute/HumanPilot/master/10X/<section>/tissue_positions_list.txt
+  Resource page:
+    https://github.com/bioc/spatialLIBD
+
+Conversion to the shared format (one dataset per section):
+  * counts.csv: the filtered 10x matrix (genes x barcodes), restricted to
+    in-tissue spots, non-mitochondrial genes, and genes expressed in at least
+    5% of the retained spots.
+  * coords.csv: barcode, row = array_row, col = array_col from the tissue
+    positions file; optional label = manual layer annotation from the original
+    study.
+
+
+2. MOUSE HYPOTHALAMUS MERFISH
+-----------------------------
+Study: Moffitt et al. (2018), manuscript reference 62.
+Study DOI: https://doi.org/10.1126/science.aau5324
+Dataset accession: Dryad DOI 10.5061/dryad.8t8s248
+Dataset URL:
+  https://datadryad.org/dataset/doi:10.5061/dryad.8t8s248
+Original expected filename:
+  Moffitt_and_Bambah-Mukku_et_al_merfish_all_cells.csv
+
+Prepared fields used in this study:
+  X0_04, X0_09, X0_14, X0_19, and X0_24
+
+Conversion to the shared format (one dataset per field):
+  * counts.csv: the field's cells from the Dryad table, transposed to genes x
+    cells, excluding Blank-control columns and non-expression metadata.
+  * coords.csv: cell ID, row = Centroid_Y, col = Centroid_X; optional label =
+    the study's cell class.
+
+
+3. MOUSE OLFACTORY BULB STEREO-SEQ
+----------------------------------
+Study resource: SEDR study resources, manuscript reference 63.
+Accession/resource identifier:
+  JinmiaoChenLab/SEDR_analyses, data/Stero-seq.tar.gz. The cited processed
+  resource does not assign a separate GEO-style accession.
+Resource URL:
+  https://github.com/JinmiaoChenLab/SEDR_analyses/tree/master/data
+Archive download URL:
+  https://github.com/JinmiaoChenLab/SEDR_analyses/raw/master/data/Stero-seq.tar.gz
+Original expected archive filename:
+  Stero-seq.tar.gz
+
+Conversion to the shared format:
+  * counts.csv: RNA_counts.tsv.gz (genes x spots), removing genes with more
+    than 99% zeros and spots with zero total count.
+  * coords.csv: spot ID = label, row = y, col = x from position.tsv.
+
+
+OPTIONAL PRETRAINED scCube INPUTS
+---------------------------------
+The scCube comparison additionally requires a pretrained model and the exact
+ordered training-gene list used by that model. These are model artifacts, not
+raw biological reference datasets, and are not redistributed here. Expected
+arguments and formats are documented in analysis/Reference_based/sccube.py
+(--training-genes takes the ordered gene list).
+
+The model is a PyTorch checkpoint. The training-gene file is a delimited text
+file whose first column gives the model's ordered gene identifiers. A model
+must only be used with its matching gene order.
