@@ -87,9 +87,14 @@ rownames(layer_coord) <- paste0("spot_",1:nrow(layer_coord))
 # fwrite(spot_count_layers,"./Data/S2_gene/simulated/S2_gene_expression_5.csv")
 # fwrite(layer_coord,"./Data/S2_gene/simulated/S2_layer_5.csv")
 
-sc_ref <- rbindlist(lapply(names(true_count), function(x) data.table(Cell_type = x, gene = t(true_count[[x]]))))
+sc_ref <- rbindlist(lapply(names(true_count), function(x) data.table(Cell_type = x, gene = true_count[[x]])))
 rownames(sc_ref) <- paste0("cell_",1:nrow(sc_ref))
 colnames(sc_ref)[c(2:ncol(sc_ref))] <- paste0("gene_",1:(ncol(sc_ref)-1))
+# One row per simulated cell (spot x cell type); columns are the spatial genes.
+stopifnot(
+  identical(colnames(sc_ref)[-1], colnames(spot_count_layers)),
+  nrow(sc_ref) == length(true_count) * nrow(coord)
+)
 
 output_dir <- scenario_output_dir("S2")
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)

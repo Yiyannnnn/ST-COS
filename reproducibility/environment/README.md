@@ -83,3 +83,21 @@ commit in detached-HEAD state, applies the recorded patch, and runs
 `git diff --check`. STAGATE-pyG is restored from its pinned Git commit by the
 Python evaluation requirements and therefore does not require a second source
 checkout.
+
+## Slurm launcher settings
+
+`downstream_check/run_method_task.sh` locates each environment through these
+variables:
+
+| Variable | Default | Points to |
+| --- | --- | --- |
+| `STCOS_USER_R_LIBRARY` | `R_LIBS_USER` | R 4.4 library with the downstream method packages |
+| `STCOS_RESOURCE_ROOT` | parent of the repository | Directory holding `Deconvolution/POLARIS_repo_20260223` and `Deconvolution/stdgcn` from `restore_external_repositories.sh` |
+| `STCOS_PYTHON_EVAL` | `$STCOS_RESOURCE_ROOT/env/STCOS_eval/bin/python` | Python 3.8 evaluation environment |
+| `STCOS_PYTHON_POLARIS` | `$STCOS_RESOURCE_ROOT/env/AD_drug/bin/python` | Python 3.12 POLARIS environment |
+| `STCOS_R_SPACEX` | `$STCOS_RESOURCE_ROOT/env/r410/bin/Rscript` | R 4.1.0 `Rscript` with the SpaceX library |
+| `STCOS_STDGCN_ROOT` | `$STCOS_RESOURCE_ROOT/Deconvolution/stdgcn` | Patched STdGCN checkout |
+
+Before submitting, `submit_all_methods.sh` checks that `STCOS_USER_R_LIBRARY`
+contains every package `RUNNER_DEPENDENCIES.tsv` lists for the R 4.4 methods.
+It stops if any are missing, so jobs never fail later on a missing package.

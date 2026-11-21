@@ -14,6 +14,7 @@ data_external/prepared/
   MOB_StereoSeq/counts.csv, coords.csv
 ```
 
-scCube additionally needs its pretrained model checkpoint and the ordered
-training-gene list for each dataset; these model artifacts are not
-redistributed.
+scCube also needs a model checkpoint and that model's ordered training-gene
+list. Checkpoints are not redistributed. Section 4 of `../EXTERNAL_INPUTS.txt`
+gives their sources, how to obtain each gene list, and the scCube-specific
+DLPFC input.

@@ -101,14 +101,49 @@ Conversion to the shared format:
   * coords.csv: spot ID = label, row = y, col = x from position.tsv.
 
 
-OPTIONAL PRETRAINED scCube INPUTS
----------------------------------
-The scCube comparison additionally requires a pretrained model and the exact
-ordered training-gene list used by that model. These are model artifacts, not
-raw biological reference datasets, and are not redistributed here. Expected
-arguments and formats are documented in analysis/Reference_based/sccube.py
-(--training-genes takes the ordered gene list).
+4. scCube MODELS AND TRAINING-GENE LISTS
+----------------------------------------
+scCube (Qian et al., Nat Commun 15, 5021 (2024)) generates data from a trained
+variational autoencoder. analysis/Reference_based/sccube.py takes the model
+checkpoint (a PyTorch state dict) and the model's ordered training-gene list
+(--training-genes; one gene per line, no header). A model must be used only
+with its own gene order. Checkpoints are not redistributed. Load checkpoints
+only from the sources below, because torch.load unpickles the file.
 
-The model is a PyTorch checkpoint. The training-gene file is a delimited text
-file whose first column gives the model's ordered gene identifiers. A model
-must only be used with its matching gene order.
+Released pretrained models (DLPFC and MERFISH)
+  The scCube authors list their trained models in
+    https://github.com/ZJUFanLab/scCube/blob/main/tutorial/statistics.md
+  Each row names a processed AnnData file and the matching checkpoint, and
+  gives a Baidu Netdisk download link (access code: cube).
+
+  * DLPFC, all 12 sections: DLPFC_<section>_adata.h5ad and
+    slice<section>_epoch100000.pth (18,094 genes).
+    Training genes: the var_names of DLPFC_151673_adata.h5ad, in order. All
+    twelve checkpoints have an 18,094-gene input layer. Their per-gene decoder
+    biases correlate with those of section 151673 (Pearson r = 0.44-0.55,
+    versus 0.01 after shuffling genes), so the twelve models share this gene
+    order.
+    scCube input: unlike the shared format in section 1, the scCube counts.csv
+    keeps all genes of the section's filtered 10x matrix (no mitochondrial or
+    5% filter) and only in-tissue spots that have a manual layer label;
+    coords.csv uses label = that layer. sccube.py reorders the genes to the
+    training list and fills the training genes absent from the matrix with
+    zeros (15 per section in this study).
+  * MERFISH, fields X0_04, X0_09, X0_14, X0_19 and X0_24: the Animal 1 models
+    for Bregma -0.04, -0.09, -0.14, -0.19 and -0.24,
+    mouse_hypothalamus_MERFISH_Animal1_Bregma_n0.<xx>_adata.h5ad and
+    bregma_n0.<xx>_epoch50000.pth (155 genes). The generated outputs used in
+    the manuscript have the cell counts listed for these models (5,488, 5,557,
+    5,926, 5,803 and 5,543).
+    Training genes: the var_names of the matching AnnData file, in order.
+
+Model trained for this study (olfactory bulb)
+  No released scCube model covers the olfactory-bulb Stereo-seq data. The
+  model used here was trained with scCube's train_vae_and_generate_cell() on
+  the prepared olfactory-bulb counts.csv (section 3). Every spot had the
+  single label "unknown" (celltype_key = "Cell_type", cell_key = "Cell"), and
+  the network used the default architecture with latent size
+  hidden_size = 128.
+  Training genes: the 8,409 genes retained by the section 3 filter, in
+  counts.csv order.
+  Checkpoint: MOB_stereoseq.pth.

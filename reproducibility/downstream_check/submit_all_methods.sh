@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Usage: submit_all_methods.sh STCOS_OUTPUT_ROOT [CHECK_ROOT]
+# STCOS_OUTPUT_ROOT is the directory the S1-S7 generators wrote to; it must
+# contain S1_gene/simulated through S7_gene/simulated.
+
 repository=$(cd "$(dirname "$0")/../.." && pwd)
 regenerated_root=${1:-"$repository/reproducibility/results/package_regeneration"}
 check_root=${2:-$regenerated_root/downstream_checks}
 runner="$repository/reproducibility/downstream_check/run_method_task.sh"
 log_dir="$check_root/logs"
-
-bash "$repository/reproducibility/downstream_check/prepare_check_tree.sh" \
-  "$repository" "$regenerated_root" "$check_root"
 
 methods=(
   BASS BAYESSPACE MAPLE STAGATE GRAPHST SPAGCN
@@ -17,6 +18,37 @@ methods=(
   CELINA CSIDE CTSV STANCE SPVC
   SPMOCA CSSN STIHC BINSPECT HDWGCNA SMOOTHIE SPACEX
 )
+
+# Stop before submitting if a job environment is incomplete. The R check uses
+# the library the jobs will use and the packages RUNNER_DEPENDENCIES.tsv lists
+# for the submitted R 4.4 methods.
+resource_root=${STCOS_RESOURCE_ROOT:-"$(cd "$repository/.." && pwd)"}
+for executable in \
+  "${STCOS_PYTHON_EVAL:-$resource_root/env/STCOS_eval/bin/python}" \
+  "${STCOS_PYTHON_POLARIS:-$resource_root/env/AD_drug/bin/python}" \
+  "${STCOS_R_SPACEX:-$resource_root/env/r410/bin/Rscript}"; do
+  if [[ ! -x "$executable" ]]; then
+    echo "Missing method environment: $executable" >&2
+    echo "See reproducibility/environment/README.md (Slurm launcher settings)." >&2
+    exit 1
+  fi
+done
+if command -v module >/dev/null 2>&1; then module load r/4.4.0; fi
+R_LIBS_USER="${STCOS_USER_R_LIBRARY:-${R_LIBS_USER:-}}" Rscript -e '
+args <- commandArgs(trailingOnly = TRUE)
+deps <- read.delim(args[1], stringsAsFactors = FALSE)
+deps <- deps[deps$environment == "R-4.4-downstream" & deps$method %in% args[-1], ]
+pkgs <- unique(sub("==.*$", "", unlist(strsplit(deps$direct_packages, ";", fixed = TRUE))))
+missing <- pkgs[!nzchar(vapply(pkgs, function(p) system.file(package = p), ""))]
+if (length(missing) > 0L) {
+  message("Missing R packages for the downstream runners: ", paste(missing, collapse = ", "))
+  message("Install the packages listed in reproducibility/RUNNER_DEPENDENCIES.tsv into an R 4.4 library and set STCOS_USER_R_LIBRARY.")
+  quit(status = 1)
+}
+' "$repository/reproducibility/RUNNER_DEPENDENCIES.tsv" "${methods[@]}"
+
+bash "$repository/reproducibility/downstream_check/prepare_check_tree.sh" \
+  "$repository" "$regenerated_root" "$check_root"
 
 job_ids=()
 job_table="$check_root/metadata/submitted_jobs.tsv"
