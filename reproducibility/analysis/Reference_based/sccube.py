@@ -6,12 +6,14 @@ Usage:
         [--training-genes genes.txt] [--seed 20260922]
 
 Input follows the shared reference-based format described in
-reproducibility/README.md; the optional ``label`` column of coords.csv is used
-as the cell-type key. scCube generates library-size-normalized log1p
-expression, so the output is output_dir/simulated_lognorm.csv (genes x
-generated observations, first column gene IDs) rather than counts.
-``--training-genes`` gives the ordered gene list used to train the model
-(first column, no header); genes absent from counts.csv are filled with zeros.
+reproducibility/README.md, except for the scCube-specific DLPFC input in
+section 4 of reproducibility/EXTERNAL_INPUTS.txt (all genes, labelled spots
+only). The optional ``label`` column of coords.csv is used as the cell-type
+key. scCube generates library-size-normalized log1p expression, so the output
+is output_dir/simulated_lognorm.csv (genes x generated observations, first
+column gene IDs) rather than counts. ``--training-genes`` gives the model's
+ordered training-gene list (one gene per line, no header). Training genes
+absent from counts.csv are filled with zeros.
 """
 
 import argparse

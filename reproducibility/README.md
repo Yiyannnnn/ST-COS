@@ -37,8 +37,8 @@ Then install the included package source:
 R CMD INSTALL .
 ```
 
-The SpaceX and Python environments are separate. Their exact restoration
-commands are in `environment/README.md`.
+The SpaceX and Python environments are separate. `environment/README.md`
+gives their restoration commands and the settings the Slurm launcher reads.
 
 ## Generate S1-S7
 
@@ -55,12 +55,19 @@ scenarios and repeat with replicate numbers 1-5.
 
 ## Run downstream methods
 
-On a Slurm system, submit all included methods after generating S1-S7:
+On a Slurm system, submit all included methods after generating S1-S7. Pass
+the same directory used as `STCOS_OUTPUT_ROOT`:
 
 ```bash
 bash reproducibility/downstream_check/submit_all_methods.sh \
   /path/to/generated_scenarios /path/to/downstream_checks
 ```
+
+Before any job is submitted, the launcher checks three things:
+- `S1_gene/simulated` through `S7_gene/simulated` exist under that directory.
+- Every single-cell reference has cells in rows, with `Cell_type` followed by
+  exactly the gene columns of the matching spatial expression table.
+- The method environments are present (see `environment/README.md`).
 
 `METHOD_SEEDS.tsv` defines the base seed for each method. The launcher combines
 that base seed with the scenario and replicate indices, and records the value in
@@ -80,10 +87,15 @@ Rscript reproducibility/analysis/Reference_based/stcos.R \
 ```
 
 The corresponding runners are `srtsim.R`, `scdesign3.R`, and `sccube.py`.
-scCube additionally requires a pretrained model and its ordered training-gene
-list. `EXTERNAL_INPUTS.txt` declares the public DLPFC Visium, hypothalamus
-MERFISH, and olfactory-bulb Stereo-seq resources, expected filenames, and
+`EXTERNAL_INPUTS.txt` declares the public DLPFC Visium, hypothalamus MERFISH,
+and olfactory-bulb Stereo-seq resources, expected filenames, and
 dataset-specific prepared formats.
+
+scCube also requires a model checkpoint and its ordered training-gene list.
+Section 4 of `EXTERNAL_INPUTS.txt` covers:
+- the released DLPFC and MERFISH models and where to download them;
+- the model trained for the olfactory bulb;
+- the scCube-specific DLPFC input.
 
 ## Scope
 
